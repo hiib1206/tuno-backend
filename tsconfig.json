@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", // 컴파일 결과 JS의 ECMAScript 버전
+    "module": "CommonJS", // 컴파일에서 ts -> js로 변환할 때 모듈 시스템 방식
+    "moduleResolution": "node", // 모듈 해석 방법 (Node.js 방식)
+    "rootDir": "src", // 소스 파일의 루트 디렉토리
+    "outDir": "dist", // 컴파일된 파일이 생성될 디렉토리
+    "esModuleInterop": true, // ES 모듈 import/export 호환
+    "strict": true, // 모든 타입 검사 옵션 활성화 (strict mode)
+    "skipLibCheck": true // 라이브러리 타입 검사 생략
+  },
+  "include": ["src"], // 컴파일에 포함할 파일/디렉토리
+  "exclude": ["node_modules", "dist"] // 컴파일에서 제외할 파일/디렉토리
+}
