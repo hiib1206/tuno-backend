@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum IsActive {
+  Y
+  N
+}
+
+model User {
+  id         Int       @id @default(autoincrement())
+
+  username   String    @unique @db.VarChar(255)
+  pw         String    @db.VarChar(255)
+  nick       String    @unique @db.VarChar(50)
+  email      String?   @unique @db.VarChar(255)
+  address    String?   @db.VarChar(400)
+
+  role       Role      @default(USER)
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt      @map("updated_at")
+
+  isActive   IsActive  @default(Y) @map("is_active")
+
+  @@index([isActive])
+}

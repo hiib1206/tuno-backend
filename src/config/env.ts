@@ -9,6 +9,15 @@ const envSchema = z.object({
   // 여기에 검증 할거 추가.
   NODE_ENV: z.enum(["development", "production", "test"]),
   PORT: z.coerce.number().min(1000).max(65535),
+
+  // database
+  DATABASE_URL: z.string().min(1),
+
+  // toekn
+  ACCESS_TOKEN_SECRET: z.string().min(64),
+  ACCESS_TOKEN_EXPIRES_IN: z.string().min(1),
+  REFRESH_TOKEN_SECRET: z.string().min(64),
+  REFRESH_TOKEN_EXPIRES_IN: z.string().min(1),
 });
 
 // 환경변수 검증 및 타입 추론
