@@ -19,20 +19,41 @@ enum IsActive {
 }
 
 model User {
-  id         Int       @id @default(autoincrement())
+  id             Int                 @id @default(autoincrement())
 
-  username   String    @unique @db.VarChar(255)
-  pw         String    @db.VarChar(255)
-  nick       String    @unique @db.VarChar(50)
-  email      String?   @unique @db.VarChar(255)
-  address    String?   @db.VarChar(400)
+  username       String              @unique @db.VarChar(255)
+  pw             String              @db.VarChar(255)
+  nick           String              @unique @db.VarChar(50)
+  email          String?             @unique @db.VarChar(255)
+  address        String?             @db.VarChar(400)
+  phone          String?             @unique @db.VarChar(30)
+  emailVerifiedAt DateTime?         @map("email_verified_at")
 
-  role       Role      @default(USER)
+  role           Role                @default(USER)
 
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt      @map("updated_at")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt      @map("updated_at")
 
-  isActive   IsActive  @default(Y) @map("is_active")
+  isActive       IsActive            @default(Y) @map("is_active")
+
+  emailVerificationCodes EmailVerificationCode[]
 
   @@index([isActive])
+}
+
+model EmailVerificationCode {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  newEmail  String?  @db.VarChar(255) @map("new_email")
+  code      String   @db.VarChar(10)
+  expiresAt DateTime @map("expires_at")
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([code])
+
+  @@map("email_verification_code")
 }

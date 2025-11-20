@@ -18,6 +18,12 @@ const envSchema = z.object({
   ACCESS_TOKEN_EXPIRES_IN: z.string().min(1),
   REFRESH_TOKEN_SECRET: z.string().min(64),
   REFRESH_TOKEN_EXPIRES_IN: z.string().min(1),
+
+  // sendgrid
+  SENDGRID_API_KEY: z.string().min(1),
+  SENDGRID_FROM_EMAIL: z.email(),
+  SENDGRID_FROM_NAME: z.string().optional(),
+  SENDGRID_EXPIRES_IN: z.coerce.number().min(1),
 });
 
 // 환경변수 검증 및 타입 추론

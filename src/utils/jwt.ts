@@ -17,7 +17,7 @@ export const refreshTokenCookieOptions: CookieOptions = {
   httpOnly: true,
   secure: env.NODE_ENV === "production",
   sameSite: "lax",
-  path: "/api/auth",
+  path: "/",
 };
 
 // Access Token 생성

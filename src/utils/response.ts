@@ -15,13 +15,15 @@ export const sendSuccess = <T = any>(
 };
 
 // 에러 응답
-export const sendError = (
+export const sendError = <T = any>(
   res: Response,
   statusCode: number = 500,
-  message: string = "Internal Server Error"
+  message: string = "Internal Server Error",
+  data?: T
 ): Response => {
   return res.status(statusCode).json({
     success: false,
     message,
+    data,
   });
 };

@@ -2,12 +2,17 @@ import { Request, Response } from "express";
 import prisma from "../config/prisma";
 import { sendError, sendSuccess } from "../utils/response";
 import bcrypt from "bcrypt";
+import { env } from "../config/env";
 import {
   generateAccessToken,
   generateRefreshToken,
   clearRefreshTokenCookie,
   setRefreshTokenCookie,
 } from "../utils/jwt";
+import {
+  generateVerificationCode,
+  sendVerificationEmail,
+} from "../utils/email";
 
 // 회원가입
 export const register = async (req: Request, res: Response) => {
@@ -40,7 +45,7 @@ export const register = async (req: Request, res: Response) => {
       },
     });
 
-    return sendSuccess(res, 201, "회원가입이 완료되었습니다.", user);
+    return sendSuccess(res, 201, "회원가입이 완료되었습니다.");
   } catch (error) {
     return sendError(res, 500, "회원가입 중 에러가 발생했습니다.");
   }
@@ -105,5 +110,206 @@ export const logout = async (_req: Request, res: Response) => {
     return sendSuccess(res, 200, "로그아웃이 완료되었습니다.");
   } catch (error) {
     return sendError(res, 500, "로그아웃 중 에러가 발생했습니다.");
+  }
+};
+
+// me
+export const me = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.user!;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+    return sendSuccess(res, 200, "내 정보를 조회했습니다.", { user });
+  } catch (error) {
+    return sendError(res, 500, "내 정보 조회 중 에러가 발생했습니다.");
+  }
+};
+
+// 이메일 인증 코드 요청
+export const requestEmailVerification = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.user!;
+    const { email } = req.body;
+
+    // 이메일 중복 확인
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser && existingUser.id !== userId) {
+      return sendError(res, 400, "이미 사용 중인 이메일입니다.");
+    }
+
+    // 기존 인증 코드가 있으면 삭제
+    await prisma.emailVerificationCode.deleteMany({
+      where: { userId },
+    });
+
+    // 6자리 코드 생성
+    const code = generateVerificationCode();
+    const expiresAt = new Date(
+      Date.now() + Number(env.SENDGRID_EXPIRES_IN) * 60 * 1000
+    ); // SENDGRID_EXPIRES_IN(분) 후 만료
+
+    // DB에 저장
+    const verificationRecord = await prisma.emailVerificationCode.create({
+      data: {
+        userId,
+        newEmail: email,
+        code,
+        expiresAt,
+      },
+    });
+
+    // SendGrid로 이메일 발송
+    try {
+      await sendVerificationEmail(email, code);
+    } catch (error) {
+      // 이메일 발송 실패 시 DB 레코드 삭제
+      await prisma.emailVerificationCode.deleteMany({
+        where: { userId, code },
+      });
+      return sendError(
+        res,
+        500,
+        error instanceof Error
+          ? error.message
+          : "이메일 발송 중 오류가 발생했습니다."
+      );
+    }
+    return sendSuccess(res, 200, "인증 코드가 이메일로 발송되었습니다.", {
+      expiresAt: verificationRecord.expiresAt.toISOString(),
+    });
+  } catch (error) {
+    return sendError(res, 500, "인증 코드 요청 중 오류가 발생했습니다.");
+  }
+};
+
+// 인증 코드 확인
+export const verifyEmailCode = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.user!;
+    const { email, code } = req.body;
+
+    // 인증 코드 조회 (userId와 email로만 조회, code는 나중에 확인)
+    const verification = await prisma.emailVerificationCode.findFirst({
+      where: {
+        userId,
+        newEmail: email,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    if (!verification) {
+      return sendError(res, 400, "유효하지 않은 인증 코드입니다.");
+    }
+
+    // 만료 시간 확인
+    if (verification.expiresAt < new Date()) {
+      await prisma.emailVerificationCode.delete({
+        where: { id: verification.id },
+      });
+      return sendError(
+        res,
+        400,
+        "입력시간이 초과 되었습니다. 재발송을 눌러주세요."
+      );
+    }
+
+    // 시도 횟수 확인 (최대 5회)
+    if (verification.attempts >= 5) {
+      await prisma.emailVerificationCode.delete({
+        where: { id: verification.id },
+      });
+      return sendError(
+        res,
+        400,
+        "인증 코드 시도 횟수를 초과했습니다. 재발송을 눌러주세요."
+      );
+    }
+
+    // 코드 일치 확인
+    if (verification.code !== code) {
+      // 시도 횟수 증가
+      const updatedVerification = await prisma.emailVerificationCode.update({
+        where: { id: verification.id },
+        data: { attempts: { increment: 1 } },
+      });
+      return sendError(
+        res,
+        400,
+        `인증 코드가 일치하지 않습니다. 시도 횟수 : ${updatedVerification.attempts}회 (최대 5회)`
+      );
+    }
+
+    // 성공: emailVerifiedAt 업데이트 및 인증 레코드 삭제
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          email: email,
+          emailVerifiedAt: new Date(),
+        },
+      }),
+      prisma.emailVerificationCode.delete({
+        where: { id: verification.id },
+      }),
+    ]);
+
+    return sendSuccess(res, 200, "이메일 인증이 완료되었습니다.");
+  } catch (error) {
+    return sendError(res, 500, "인증 코드 확인 중 오류가 발생했습니다.");
+  }
+};
+
+// 인증 코드 재발송
+export const resendEmailVerification = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.user!;
+    const { email } = req.body;
+
+    // 기존 코드 삭제
+    await prisma.emailVerificationCode.deleteMany({
+      where: { userId },
+    });
+
+    // 새 코드 생성 및 발송 (requestEmailVerification과 동일한 로직)
+    const code = generateVerificationCode();
+    const expiresAt = new Date(
+      Date.now() + Number(env.SENDGRID_EXPIRES_IN) * 60 * 1000
+    ); // SENDGRID_EXPIRES_IN(분) 후 만료
+
+    const verificationRecord = await prisma.emailVerificationCode.create({
+      data: {
+        userId,
+        newEmail: email,
+        code,
+        expiresAt,
+      },
+    });
+
+    try {
+      await sendVerificationEmail(email, code);
+    } catch (error) {
+      await prisma.emailVerificationCode.deleteMany({
+        where: { userId, code },
+      });
+      return sendError(
+        res,
+        500,
+        error instanceof Error
+          ? error.message
+          : "이메일 발송 중 오류가 발생했습니다."
+      );
+    }
+
+    return sendSuccess(res, 200, "인증 코드가 재발송되었습니다.", {
+      expiresAt: verificationRecord.expiresAt.toISOString(),
+    });
+  } catch (error) {
+    return sendError(res, 500, "인증 코드 재발송 중 오류가 발생했습니다.");
   }
 };
