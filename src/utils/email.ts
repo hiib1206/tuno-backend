@@ -23,9 +23,6 @@ export async function sendVerificationEmail(
   to: string,
   code: string
 ): Promise<void> {
-  const fromEmail = env.SENDGRID_FROM_EMAIL;
-  const fromName = env.SENDGRID_FROM_NAME;
-
   // 에메랄드 그린 색상 (프로젝트 accent 색상 기반)
   const primaryColor = "#10b981"; // emerald-500
   const primaryColorDark = "#059669"; // emerald-600
@@ -180,20 +177,13 @@ export async function sendVerificationEmail(
   const msg = {
     to,
     from: {
-      email: fromEmail,
-      name: fromName,
+      email: env.SENDGRID_FROM_EMAIL, //발신자 이메일
+      name: env.SENDGRID_FROM_NAME, //발신자 이름
     },
-    subject: "이메일 인증 코드",
+    subject: "AI Trader 회원 이메일 인증 요청",
     text: textContent,
     html: htmlContent,
   };
 
-  try {
-    await sgMail.send(msg);
-  } catch (error) {
-    if (error instanceof Error) {
-      throw new Error(`이메일 발송 실패: ${error.message}`);
-    }
-    throw new Error("이메일 발송 중 알 수 없는 오류가 발생했습니다.");
-  }
+  await sgMail.send(msg);
 }

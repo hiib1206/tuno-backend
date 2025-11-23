@@ -19,7 +19,7 @@ interface SchemaSet {
  * 모든 유효성 검사가 통과하면 req 객체의 값을 파싱 결과로 교체하고, 다음 미들웨어로 흐름을 넘깁니다.
  */
 
-export const validate =
+export const validateMiddleware =
   (schemas: SchemaSet) => (req: Request, res: Response, next: NextFunction) => {
     try {
       if (schemas.body) req.body = schemas.body.parse(req.body) as any;

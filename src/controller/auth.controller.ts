@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import prisma from "../config/prisma";
 import { sendError, sendSuccess } from "../utils/response";
 import bcrypt from "bcrypt";
@@ -13,9 +13,14 @@ import {
   generateVerificationCode,
   sendVerificationEmail,
 } from "../utils/email";
+import { toUserResponse } from "../utils/user";
 
 // 회원가입
-export const register = async (req: Request, res: Response) => {
+export const register = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { username, pw, nick } = req.body;
 
@@ -47,12 +52,16 @@ export const register = async (req: Request, res: Response) => {
 
     return sendSuccess(res, 201, "회원가입이 완료되었습니다.");
   } catch (error) {
-    return sendError(res, 500, "회원가입 중 에러가 발생했습니다.");
+    next(error);
   }
 };
 
 // 로그인
-export const login = async (req: Request, res: Response) => {
+export const login = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { username, pw } = req.body;
     if (!username || !pw) {
@@ -78,15 +87,19 @@ export const login = async (req: Request, res: Response) => {
 
     return sendSuccess(res, 200, "로그인이 완료되었습니다.", {
       accessToken,
-      user,
+      user: toUserResponse(user),
     });
   } catch (error) {
-    return sendError(res, 500, "로그인 중 오류가 발생했습니다.");
+    next(error);
   }
 };
 
 // refresh
-export const refresh = async (req: Request, res: Response) => {
+export const refresh = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { userId } = req.user!;
 
@@ -99,35 +112,50 @@ export const refresh = async (req: Request, res: Response) => {
       accessToken,
     });
   } catch (error) {
-    return sendError(res, 500, "토큰 갱신 중 에러가 발생했습니다.");
+    next(error);
   }
 };
 
 // 로그아웃
-export const logout = async (_req: Request, res: Response) => {
+export const logout = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     clearRefreshTokenCookie(res);
     return sendSuccess(res, 200, "로그아웃이 완료되었습니다.");
   } catch (error) {
-    return sendError(res, 500, "로그아웃 중 에러가 발생했습니다.");
+    next(error);
   }
 };
 
 // me
-export const me = async (req: Request, res: Response) => {
+export const me = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { userId } = req.user!;
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
-    return sendSuccess(res, 200, "내 정보를 조회했습니다.", { user });
+
+    if (!user) {
+      return sendError(res, 404, "사용자를 찾을 수 없습니다.");
+    }
+
+    return sendSuccess(res, 200, "내 정보를 조회했습니다.", {
+      user: toUserResponse(user),
+    });
   } catch (error) {
-    return sendError(res, 500, "내 정보 조회 중 에러가 발생했습니다.");
+    next(error);
   }
 };
 
 // 이메일 인증 코드 요청
-export const requestEmailVerification = async (req: Request, res: Response) => {
+export const requestEmailVerification = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { userId } = req.user!;
     const { email } = req.body;
@@ -152,6 +180,8 @@ export const requestEmailVerification = async (req: Request, res: Response) => {
       Date.now() + Number(env.SENDGRID_EXPIRES_IN) * 60 * 1000
     ); // SENDGRID_EXPIRES_IN(분) 후 만료
 
+    await sendVerificationEmail(email, code);
+
     // DB에 저장
     const verificationRecord = await prisma.emailVerificationCode.create({
       data: {
@@ -162,32 +192,20 @@ export const requestEmailVerification = async (req: Request, res: Response) => {
       },
     });
 
-    // SendGrid로 이메일 발송
-    try {
-      await sendVerificationEmail(email, code);
-    } catch (error) {
-      // 이메일 발송 실패 시 DB 레코드 삭제
-      await prisma.emailVerificationCode.deleteMany({
-        where: { userId, code },
-      });
-      return sendError(
-        res,
-        500,
-        error instanceof Error
-          ? error.message
-          : "이메일 발송 중 오류가 발생했습니다."
-      );
-    }
     return sendSuccess(res, 200, "인증 코드가 이메일로 발송되었습니다.", {
       expiresAt: verificationRecord.expiresAt.toISOString(),
     });
   } catch (error) {
-    return sendError(res, 500, "인증 코드 요청 중 오류가 발생했습니다.");
+    next(error);
   }
 };
 
 // 인증 코드 확인
-export const verifyEmailCode = async (req: Request, res: Response) => {
+export const verifyEmailCode = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { userId } = req.user!;
     const { email, code } = req.body;
@@ -261,12 +279,16 @@ export const verifyEmailCode = async (req: Request, res: Response) => {
 
     return sendSuccess(res, 200, "이메일 인증이 완료되었습니다.");
   } catch (error) {
-    return sendError(res, 500, "인증 코드 확인 중 오류가 발생했습니다.");
+    next(error);
   }
 };
 
 // 인증 코드 재발송
-export const resendEmailVerification = async (req: Request, res: Response) => {
+export const resendEmailVerification = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { userId } = req.user!;
     const { email } = req.body;
@@ -282,6 +304,8 @@ export const resendEmailVerification = async (req: Request, res: Response) => {
       Date.now() + Number(env.SENDGRID_EXPIRES_IN) * 60 * 1000
     ); // SENDGRID_EXPIRES_IN(분) 후 만료
 
+    await sendVerificationEmail(email, code);
+
     const verificationRecord = await prisma.emailVerificationCode.create({
       data: {
         userId,
@@ -291,25 +315,10 @@ export const resendEmailVerification = async (req: Request, res: Response) => {
       },
     });
 
-    try {
-      await sendVerificationEmail(email, code);
-    } catch (error) {
-      await prisma.emailVerificationCode.deleteMany({
-        where: { userId, code },
-      });
-      return sendError(
-        res,
-        500,
-        error instanceof Error
-          ? error.message
-          : "이메일 발송 중 오류가 발생했습니다."
-      );
-    }
-
     return sendSuccess(res, 200, "인증 코드가 재발송되었습니다.", {
       expiresAt: verificationRecord.expiresAt.toISOString(),
     });
   } catch (error) {
-    return sendError(res, 500, "인증 코드 재발송 중 오류가 발생했습니다.");
+    next(error);
   }
 };

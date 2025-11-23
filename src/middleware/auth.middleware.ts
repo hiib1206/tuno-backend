@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 
 // access token 검증
-export const verifyAccessToken = (
+export const verifyAccessTokenMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction
@@ -34,16 +34,12 @@ export const verifyAccessToken = (
     if (error instanceof jwt.JsonWebTokenError) {
       return sendError(res, 401, "유효하지 않은 access token입니다.");
     }
-    return sendError(
-      res,
-      500,
-      "access token 검증 중 예상치 못한 에러가 발생했습니다."
-    );
+    return sendError(res, 500, "access token 검증 중 오류가 발생했습니다.");
   }
 };
 
 // refresh token 검증
-export const verifyRefreshToken = (
+export const verifyRefreshTokenMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction
@@ -69,10 +65,6 @@ export const verifyRefreshToken = (
       clearRefreshTokenCookie(res);
       return sendError(res, 401, "유효하지 않은 refresh token입니다.");
     }
-    return sendError(
-      res,
-      500,
-      "refresh token 검증 중 예상치 못한 에러가 발생했습니다."
-    );
+    return sendError(res, 500, "refresh token 검증 중 오류가 발생했습니다.");
   }
 };

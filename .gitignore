@@ -97,3 +97,9 @@ out/
 
 
 /src/generated/prisma
+
+
+
+
+# 개인 테스트 용
+/uploads

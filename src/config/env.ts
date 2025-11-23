@@ -24,6 +24,10 @@ const envSchema = z.object({
   SENDGRID_FROM_EMAIL: z.email(),
   SENDGRID_FROM_NAME: z.string().optional(),
   SENDGRID_EXPIRES_IN: z.coerce.number().min(1),
+
+  // firebase
+  FIREBASE_CREDENTIAL: z.string().min(1),
+  FIREBASE_STORAGE_BUCKET: z.string().min(1),
 });
 
 // 환경변수 검증 및 타입 추론
