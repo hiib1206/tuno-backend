@@ -8,51 +8,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
+model email_verification_code {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  new_email  String?  @db.VarChar(255)
+  code       String   @db.VarChar(10)
+  expires_at DateTime
+  attempts   Int      @default(0)
+  created_at DateTime @default(now())
+  user       user     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([user_id])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model kospi_master {
+  id                 Int       @id @default(autoincrement())
+  mksc_shrn_iscd     String    @unique(map: "mksc_shrn_iscd") @db.VarChar(9)
+  stnd_iscd          String    @unique(map: "stnd_iscd") @db.VarChar(12)
+  hts_kor_isnm       String    @unique(map: "hts_kor_isnm") @db.VarChar(50)
+  scrt_grp_cls_code  String?   @db.VarChar(2)
+  avls_scal_cls_code String?   @db.VarChar(1)
+  bstp_larg_div_code String?   @db.VarChar(4)
+  bstp_medm_div_code String?   @db.VarChar(4)
+  bstp_smal_div_code String?   @db.VarChar(4)
+  created_at         DateTime? @default(now()) @db.Timestamp(3)
+  updated_at         DateTime? @default(now()) @db.Timestamp(3)
+
+  @@index([bstp_larg_div_code], map: "idx_bstp_larg_div_code")
+  @@index([scrt_grp_cls_code], map: "idx_scrt_grp_cls_code")
+}
+
+model user {
+  id                      Int                       @id @default(autoincrement())
+  username                String                    @unique(map: "User_username_key") @db.VarChar(255)
+  email                   String?                   @unique(map: "User_email_key") @db.VarChar(255)
+  pw                      String                    @db.VarChar(255)
+  nick                    String                    @unique(map: "User_nick_key") @db.VarChar(50)
+  phone                   String?                   @unique(map: "User_phone_key") @db.VarChar(30)
+  address                 String?                   @db.VarChar(400)
+  role                    user_role                 @default(USER)
+  created_at              DateTime                  @default(now())
+  updated_at              DateTime                  @default(now())
+  is_active               user_is_active            @default(Y)
+  email_verified_at       DateTime?
+  profile_image_url       String?                   @db.VarChar(255)
+  email_verification_code email_verification_code[]
+
+  @@index([is_active], map: "User_is_active_idx")
+}
+
+enum user_role {
   USER
   ADMIN
 }
 
-enum IsActive {
+enum user_is_active {
   Y
   N
-}
-
-model User {
-  id               Int                 @id @default(autoincrement())
-
-  username         String              @unique @db.VarChar(255)
-  pw               String              @db.VarChar(255)
-  nick             String              @unique @db.VarChar(50)
-  email            String?             @unique @db.VarChar(255)
-  address          String?             @db.VarChar(400)
-  phone            String?             @unique @db.VarChar(30)
-  emailVerifiedAt  DateTime?           @map("email_verified_at")
-  role             Role                @default(USER)
-  profileImageUrl  String?             @db.VarChar(255) @map("profile_image_url")
-  createdAt        DateTime            @default(now()) @map("created_at")
-  updatedAt        DateTime            @updatedAt      @map("updated_at")
-
-  isActive         IsActive            @default(Y) @map("is_active")
-
-  emailVerificationCodes EmailVerificationCode[]
-
-  @@index([isActive])
-}
-
-model EmailVerificationCode {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @map("user_id")
-  newEmail  String?  @db.VarChar(255) @map("new_email")
-  code      String   @db.VarChar(10)
-  expiresAt DateTime @map("expires_at")
-  attempts  Int      @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([code])
-
-  @@map("email_verification_code")
 }

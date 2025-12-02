@@ -1,4 +1,20 @@
 import { Response } from "express";
+import camelCase from "lodash/camelCase";
+
+// snake_case to camelCase
+const convertKeysToCamel = (data: any): any => {
+  if (Array.isArray(data)) {
+    return data.map(convertKeysToCamel);
+  } else if (data && typeof data === "object" && data.constructor === Object) {
+    return Object.fromEntries(
+      Object.entries(data).map(([key, value]) => [
+        camelCase(key),
+        convertKeysToCamel(value),
+      ])
+    );
+  }
+  return data;
+};
 
 // 성공 응답
 export const sendSuccess = <T = any>(
@@ -10,7 +26,7 @@ export const sendSuccess = <T = any>(
   return res.status(statusCode).json({
     success: true,
     message,
-    data,
+    data: convertKeysToCamel(data),
   });
 };
 
@@ -24,6 +40,6 @@ export const sendError = <T = any>(
   return res.status(statusCode).json({
     success: false,
     message,
-    data,
+    data: convertKeysToCamel(data),
   });
 };

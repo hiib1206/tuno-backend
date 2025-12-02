@@ -1,8 +1,9 @@
 import { Router } from "express";
 import {
   testAccessToken,
-  testResponse,
   testFileUpload,
+  testRedis,
+  testResponse,
 } from "../controller/test.controller";
 import { verifyAccessTokenMiddleware } from "../middleware/auth.middleware";
 import { uploadProfileImageMiddleware } from "../middleware/multer.middleware";
@@ -15,5 +16,7 @@ testRouter.get("/important", verifyAccessTokenMiddleware, testAccessToken);
 testRouter.get("/response", testResponse);
 // POST api/test/upload
 testRouter.post("/upload", uploadProfileImageMiddleware, testFileUpload);
+// POST api/test/redis
+testRouter.post("/redis", testRedis);
 
 export default testRouter;

@@ -1,5 +1,5 @@
-import { z } from "zod";
 import dotenv from "dotenv";
+import { z } from "zod";
 import { formatZodError } from "../utils/zod";
 
 dotenv.config();
@@ -12,6 +12,10 @@ const envSchema = z.object({
 
   // database
   DATABASE_URL: z.string().min(1),
+  // redis
+  REDIS_HOST: z.string().min(1),
+  REDIS_PORT: z.coerce.number().min(1000).max(65535),
+  REDIS_PASSWORD: z.string().min(1),
 
   // toekn
   ACCESS_TOKEN_SECRET: z.string().min(64),

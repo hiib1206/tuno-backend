@@ -1,20 +1,13 @@
 import { Router } from "express";
 import {
+  login,
   logout,
-  me,
   refresh,
   register,
-  requestEmailVerification,
-  verifyEmailCode,
-  resendEmailVerification,
 } from "../controller/auth.controller";
-import { login } from "../controller/auth.controller";
+import { verifyRefreshTokenMiddleware } from "../middleware/auth.middleware";
 import { validateMiddleware } from "../middleware/validation.middleware";
 import { registerSchema } from "../schema/auth.schema";
-import {
-  verifyAccessTokenMiddleware,
-  verifyRefreshTokenMiddleware,
-} from "../middleware/auth.middleware";
 
 const authRouter = Router();
 
@@ -30,21 +23,5 @@ authRouter.post("/login", login);
 authRouter.post("/refresh", verifyRefreshTokenMiddleware, refresh);
 // POST api/auth/logout
 authRouter.post("/logout", logout);
-// GET api/auth/me
-authRouter.get("/me", verifyAccessTokenMiddleware, me);
-// POST api/auth/email/request
-authRouter.post(
-  "/email/request",
-  verifyAccessTokenMiddleware,
-  requestEmailVerification
-);
-// POST api/auth/email/verify
-authRouter.post("/email/verify", verifyAccessTokenMiddleware, verifyEmailCode);
-// POST api/auth/email/resend
-authRouter.post(
-  "/email/resend",
-  verifyAccessTokenMiddleware,
-  resendEmailVerification
-);
 
 export default authRouter;

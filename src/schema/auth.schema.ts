@@ -21,22 +21,3 @@ export const registerSchema = z.object({
     .min(2, "닉네임은 최소 2자 이상이어야 합니다.")
     .max(20, "닉네임은 최대 20자까지 가능합니다."),
 });
-
-// // 이메일 인증 코드 요청
-// export const requestEmailVerificationSchema = z.object({
-//   email: z.string().email("올바른 이메일 형식이 아닙니다."),
-// });
-
-// // 인증 코드 확인
-// export const verifyEmailCodeSchema = z.object({
-//   email: z.string().email("올바른 이메일 형식이 아닙니다."),
-//   code: z
-//     .string()
-//     .length(6, "인증 코드는 6자리여야 합니다.")
-//     .regex(/^\d+$/, "인증 코드는 숫자만 가능합니다."),
-// });
-
-// // 인증 코드 재발송
-// export const resendEmailVerificationSchema = z.object({
-//   email: z.string().email("올바른 이메일 형식이 아닙니다."),
-// });

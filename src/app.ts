@@ -1,10 +1,10 @@
+import cookieParser from "cookie-parser";
+import cors from "cors";
 import express from "express";
 import { errorHandler } from "./middleware/error.middleware";
-import authRouter from "./route/auth.route";
-import cors from "cors";
-import cookieParser from "cookie-parser";
-import testRouter from "./route/test.route";
 import morganMiddleware from "./middleware/morgan.middleware";
+import authRouter from "./route/auth.route";
+import testRouter from "./route/test.route";
 import userRouter from "./route/user.route";
 const app = express();
 
@@ -12,7 +12,11 @@ const app = express();
 app.use(morganMiddleware);
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://localhost:3001"],
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://59.25.224.32:3000",
+    ],
     credentials: true,
   })
 );

@@ -1,8 +1,10 @@
-import prisma from "../config/prisma";
-import { sendError, sendSuccess } from "../utils/response";
 import { NextFunction, Request, Response } from "express";
 import fs from "fs";
 import path from "path";
+import prisma from "../config/prisma";
+import redis from "../config/redis";
+import { sendError, sendSuccess } from "../utils/response";
+import { toUserResponse } from "../utils/user";
 
 // access token 검증 테스트
 export const testAccessToken = async (
@@ -32,8 +34,13 @@ export const testResponse = async (
         id: 3,
       },
     });
+
+    if (!user) {
+      return sendError(res, 404, "사용자를 찾을 수 없습니다.");
+    }
+
     return sendSuccess(res, 200, "응답 테스트가 완료되었습니다.", {
-      user,
+      user: toUserResponse(user),
     });
   } catch (error) {
     next(error);
@@ -84,6 +91,38 @@ export const testFileUpload = async (
         url: `/uploads/${fileName}`, // 정적 파일 서빙을 위한 URL
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Redis 저장 테스트
+export const testRedis = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    // 하드코딩된 샘플 값
+    const key = "test:redis:sample";
+    const value = "Hello Redis! This is a test value.";
+
+    // Redis에 데이터 저장 (TTL: 1시간)
+    await redis.set(key, value, "EX", 3600);
+
+    // 저장된 값 확인
+    const storedValue = await redis.get(key);
+
+    return sendSuccess(
+      res,
+      200,
+      "Redis에 데이터가 성공적으로 저장되었습니다.",
+      {
+        key,
+        storedValue,
+        ttl: 3600, // seconds
+      }
+    );
   } catch (error) {
     next(error);
   }
