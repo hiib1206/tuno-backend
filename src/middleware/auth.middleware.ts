@@ -1,8 +1,13 @@
 import { NextFunction, Request, Response } from "express";
-import { sendError } from "../utils/response";
-import { clearRefreshTokenCookie, JwtPayload } from "../utils/jwt";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
+import { sendError } from "../utils/response";
+import {
+  clearRefreshTokenCookie,
+  getRefreshToken,
+  getUserIdAndDeviceIdFromToken,
+  JwtPayload,
+} from "../utils/token";
 
 // access token 검증
 export const verifyAccessTokenMiddleware = (
@@ -24,6 +29,7 @@ export const verifyAccessTokenMiddleware = (
       return sendError(res, 401, "access token이 존재하지 않습니다.");
     }
 
+    // decoded: { userId: number }
     const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET) as JwtPayload;
     req.user = decoded;
     next();
@@ -34,12 +40,12 @@ export const verifyAccessTokenMiddleware = (
     if (error instanceof jwt.JsonWebTokenError) {
       return sendError(res, 401, "유효하지 않은 access token입니다.");
     }
-    return sendError(res, 500, "access token 검증 중 오류가 발생했습니다.");
+    next(error);
   }
 };
 
 // refresh token 검증
-export const verifyRefreshTokenMiddleware = (
+export const verifyRefreshTokenMiddleware = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -50,21 +56,40 @@ export const verifyRefreshTokenMiddleware = (
       return sendError(res, 401, "refresh token이 존재하지 않습니다.");
     }
 
-    const decoded = jwt.verify(
-      refreshToken,
-      env.REFRESH_TOKEN_SECRET
-    ) as JwtPayload;
-    req.user = decoded;
-    next();
-  } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
+    // UUID 형식 검증 (간단한 체크 모든 uuid버전 다 통과함)
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(refreshToken)) {
       clearRefreshTokenCookie(res);
-      return sendError(res, 401, "만료된 refresh token입니다.");
+      return sendError(res, 401, "유효하지 않은 refresh token 형식입니다.");
     }
-    if (error instanceof jwt.JsonWebTokenError) {
+
+    // tokenInfo: { userId: number, deviceId: string } or null
+    const tokenInfo = await getUserIdAndDeviceIdFromToken(refreshToken);
+    if (!tokenInfo) {
       clearRefreshTokenCookie(res);
       return sendError(res, 401, "유효하지 않은 refresh token입니다.");
     }
-    return sendError(res, 500, "refresh token 검증 중 오류가 발생했습니다.");
+
+    const { userId, deviceId } = tokenInfo;
+
+    // 실제 토큰 검증
+    const tokenData = await getRefreshToken(userId, deviceId, refreshToken);
+    if (!tokenData) {
+      clearRefreshTokenCookie(res);
+      return sendError(res, 401, "유효하지 않은 refresh token입니다.");
+    }
+
+    // req.user에 userId 설정
+    req.user = { userId };
+
+    // req에 추가 정보 저장 (필요시 사용)
+    (req as any).refreshToken = refreshToken;
+    (req as any).deviceId = deviceId;
+
+    next();
+  } catch (error) {
+    clearRefreshTokenCookie(res);
+    next(error);
   }
 };

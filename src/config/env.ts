@@ -20,7 +20,6 @@ const envSchema = z.object({
   // toekn
   ACCESS_TOKEN_SECRET: z.string().min(64),
   ACCESS_TOKEN_EXPIRES_IN: z.string().min(1),
-  REFRESH_TOKEN_SECRET: z.string().min(64),
   REFRESH_TOKEN_EXPIRES_IN: z.string().min(1),
 
   // sendgrid

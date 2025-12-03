@@ -2,17 +2,19 @@ import bcrypt from "bcrypt";
 import { NextFunction, Request, Response } from "express";
 import { env } from "../config/env";
 import prisma from "../config/prisma";
-import {
-  generateVerificationCode,
-  sendVerificationEmail,
-} from "../utils/email";
+import { sendError, sendSuccess } from "../utils/response";
 import {
   clearRefreshTokenCookie,
+  deleteRefreshToken,
   generateAccessToken,
   generateRefreshToken,
+  getClientIp,
+  getDeviceId,
+  getUserAgent,
+  getUserIdAndDeviceIdFromToken,
+  saveRefreshToken,
   setRefreshTokenCookie,
-} from "../utils/jwt";
-import { sendError, sendSuccess } from "../utils/response";
+} from "../utils/token";
 import { toUserResponse } from "../utils/user";
 
 // 회원가입
@@ -81,7 +83,20 @@ export const login = async (
     }
 
     const accessToken = generateAccessToken(user.id);
-    const refreshToken = generateRefreshToken(user.id);
+    const refreshToken = generateRefreshToken();
+    const deviceId = getDeviceId(req);
+    const userAgent = getUserAgent(req);
+    const clientIp = getClientIp(req);
+
+    // Redis에 리프레시 토큰 저장
+    await saveRefreshToken(
+      user.id,
+      deviceId,
+      refreshToken,
+      userAgent,
+      clientIp,
+      env.REFRESH_TOKEN_EXPIRES_IN
+    );
 
     setRefreshTokenCookie(res, refreshToken);
 
@@ -102,9 +117,29 @@ export const refresh = async (
 ) => {
   try {
     const { userId } = req.user!;
+    const oldRefreshToken = (req as any).refreshToken;
+    const oldDeviceId = (req as any).deviceId;
 
+    // 기존 리프레시 토큰 삭제
+    if (oldRefreshToken && oldDeviceId) {
+      await deleteRefreshToken(userId, oldDeviceId);
+    }
+
+    // 새 리프레시 토큰 생성 및 저장
     const accessToken = generateAccessToken(userId);
-    const refreshToken = generateRefreshToken(userId);
+    const refreshToken = generateRefreshToken();
+    const deviceId = getDeviceId(req);
+    const userAgent = getUserAgent(req);
+    const clientIp = getClientIp(req);
+
+    await saveRefreshToken(
+      userId,
+      deviceId,
+      refreshToken,
+      userAgent,
+      clientIp,
+      env.REFRESH_TOKEN_EXPIRES_IN
+    );
 
     setRefreshTokenCookie(res, refreshToken);
 
@@ -118,11 +153,22 @@ export const refresh = async (
 
 // 로그아웃
 export const logout = async (
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
+    const refreshToken = req.cookies.refreshToken;
+
+    // Redis에서 리프레시 토큰 삭제
+    if (refreshToken) {
+      // tokenInfo: { userId: number, deviceId: string } or null
+      const tokenInfo = await getUserIdAndDeviceIdFromToken(refreshToken);
+      if (tokenInfo) {
+        await deleteRefreshToken(tokenInfo.userId, tokenInfo.deviceId);
+      }
+    }
+
     clearRefreshTokenCookie(res);
     return sendSuccess(res, 200, "로그아웃이 완료되었습니다.");
   } catch (error) {
