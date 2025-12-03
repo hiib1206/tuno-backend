@@ -6,7 +6,7 @@ import {
   clearRefreshTokenCookie,
   getRefreshToken,
   getUserIdAndDeviceIdFromToken,
-  JwtPayload,
+  UserPayload,
 } from "../utils/token";
 
 // access token 검증
@@ -30,7 +30,7 @@ export const verifyAccessTokenMiddleware = (
     }
 
     // decoded: { userId: number }
-    const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET) as UserPayload;
     req.user = decoded;
     next();
   } catch (error) {
@@ -84,8 +84,8 @@ export const verifyRefreshTokenMiddleware = async (
     req.user = { userId };
 
     // req에 추가 정보 저장 (필요시 사용)
-    (req as any).refreshToken = refreshToken;
-    (req as any).deviceId = deviceId;
+    req.refreshToken = refreshToken;
+    req.deviceId = deviceId;
 
     next();
   } catch (error) {

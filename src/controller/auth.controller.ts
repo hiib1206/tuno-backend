@@ -2,15 +2,13 @@ import bcrypt from "bcrypt";
 import { NextFunction, Request, Response } from "express";
 import { env } from "../config/env";
 import prisma from "../config/prisma";
+import { getClientIp, getDeviceId, getUserAgent } from "../utils/request";
 import { sendError, sendSuccess } from "../utils/response";
 import {
   clearRefreshTokenCookie,
   deleteRefreshToken,
   generateAccessToken,
   generateRefreshToken,
-  getClientIp,
-  getDeviceId,
-  getUserAgent,
   getUserIdAndDeviceIdFromToken,
   saveRefreshToken,
   setRefreshTokenCookie,
@@ -117,8 +115,8 @@ export const refresh = async (
 ) => {
   try {
     const { userId } = req.user!;
-    const oldRefreshToken = (req as any).refreshToken;
-    const oldDeviceId = (req as any).deviceId;
+    const oldRefreshToken = req.refreshToken;
+    const oldDeviceId = req.deviceId;
 
     // 기존 리프레시 토큰 삭제
     if (oldRefreshToken && oldDeviceId) {

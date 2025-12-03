@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "crypto";
-import { CookieOptions, Request, Response } from "express";
+import { CookieOptions, Response } from "express";
 import jwt, { SignOptions } from "jsonwebtoken";
 import type { StringValue } from "ms";
 import ms from "ms";
@@ -7,7 +7,7 @@ import { env } from "../config/env";
 import redis from "../config/redis";
 
 // payload type
-export interface JwtPayload {
+export interface UserPayload {
   userId: number;
 }
 
@@ -48,42 +48,22 @@ export const clearRefreshTokenCookie = (res: Response) => {
   res.clearCookie(refreshTokenCookieName, refreshTokenCookieOptions);
 };
 
-// Device ID 추출 (헤더에서 가져오거나 기본값 사용)
-export const getDeviceId = (req: Request): string => {
-  return (req.headers["x-device-id"] as string) || "web";
-};
-
-// Client IP 추출
-export const getClientIp = (req: Request): string => {
-  return (
-    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-    (req.headers["x-real-ip"] as string) ||
-    req.socket.remoteAddress ||
-    "unknown"
-  );
-};
-
-// User Agent 추출
-export const getUserAgent = (req: Request): string => {
-  return req.headers["user-agent"] || "unknown";
-};
-
-// Refresh Token을 SHA256 해시로 변환
+// Refresh Token을 SHA256 해시 처리하는 함수
 const hashRefreshToken = (token: string): string => {
   return createHash("sha256").update(token).digest("hex");
 };
 
-// Redis Key 생성
+// Redis Key 생성하는 함수
 const getRefreshTokenKey = (userId: number, deviceId: string): string => {
   return `refresh_token:${userId}:${deviceId}`;
 };
 
-// 토큰 해시로 userId와 deviceId를 찾기 위한 인덱스 Key 생성
+// 토큰 해시로 userId와 deviceId를 찾기 위한 인덱스 Key 생성하는 함수
 const getTokenIndexKey = (hashedToken: string): string => {
   return `refresh_token_index:${hashedToken}`;
 };
 
-// Refresh Token을 Redis에 저장
+// Refresh Token을 Redis에 저장하는 함수
 export const saveRefreshToken = async (
   userId: number,
   deviceId: string,
@@ -120,7 +100,7 @@ export const saveRefreshToken = async (
   await redis.set(indexKey, `${userId}:${deviceId}`, "EX", expireSeconds);
 };
 
-// 토큰 해시로 userId와 deviceId 찾는 함수
+// 토큰 해시로 userId와 deviceId를 찾는 함수
 export const getUserIdAndDeviceIdFromToken = async (
   refreshToken: string
 ): Promise<{ userId: number; deviceId: string } | null> => {
@@ -141,7 +121,7 @@ export const getUserIdAndDeviceIdFromToken = async (
   };
 };
 
-// Refresh Token 조회 및 검증
+// Refresh Token 조회 및 검증하는 함수
 export const getRefreshToken = async (
   userId: number,
   deviceId: string,
@@ -168,7 +148,7 @@ export const getRefreshToken = async (
   };
 };
 
-// Refresh Token 삭제
+// Refresh Token 삭제하는 함수
 export const deleteRefreshToken = async (
   userId: number,
   deviceId: string
@@ -185,7 +165,7 @@ export const deleteRefreshToken = async (
   await redis.del(key);
 };
 
-// 사용자의 모든 Refresh Token 삭제
+// 사용자의 모든 Refresh Token 삭제하는 함수
 export const deleteAllRefreshTokens = async (userId: number): Promise<void> => {
   const pattern = `refresh_token:${userId}:*`;
   const keys = await redis.keys(pattern);
