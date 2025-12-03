@@ -1,9 +1,11 @@
-import { JwtPayload } from "../utils/jwt";
+import { UserPayload } from "../utils/token";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: JwtPayload;
+      user?: UserPayload;
+      refreshToken?: string;
+      deviceId?: string;
     }
   }
 }
