@@ -41,20 +41,21 @@ model kospi_master {
 }
 
 model user {
-  id                      Int                       @id @default(autoincrement())
-  username                String                    @unique(map: "User_username_key") @db.VarChar(255)
-  email                   String?                   @unique(map: "User_email_key") @db.VarChar(255)
-  pw                      String                    @db.VarChar(255)
-  nick                    String                    @unique(map: "User_nick_key") @db.VarChar(50)
-  phone                   String?                   @unique(map: "User_phone_key") @db.VarChar(30)
-  address                 String?                   @db.VarChar(400)
-  role                    user_role                 @default(USER)
-  created_at              DateTime                  @default(now())
-  updated_at              DateTime                  @default(now())
-  is_active               user_is_active            @default(Y)
-  email_verified_at       DateTime?
-  profile_image_url       String?                   @db.VarChar(255)
-  email_verification_code email_verification_code[]
+  id                       Int                       @id @default(autoincrement())
+  username                 String                    @unique(map: "User_username_key") @db.VarChar(255)
+  email                    String?                   @unique(map: "User_email_key") @db.VarChar(255)
+  pw                       String                    @db.VarChar(255)
+  nick                     String                    @unique(map: "User_nick_key") @db.VarChar(50)
+  phone                    String?                   @unique(map: "User_phone_key") @db.VarChar(30)
+  address                  String?                   @db.VarChar(400)
+  role                     user_role                 @default(USER)
+  created_at               DateTime                  @default(now())
+  updated_at               DateTime                  @default(now())
+  is_active                user_is_active            @default(Y)
+  email_verified_at        DateTime?
+  profile_image_url        String?                   @db.VarChar(255)
+  profile_image_updated_at DateTime?
+  email_verification_code  email_verification_code[]
 
   @@index([is_active], map: "User_is_active_idx")
 }

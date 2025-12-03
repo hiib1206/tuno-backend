@@ -170,7 +170,10 @@ export const uploadProfileImage = async (
     // DB에 프로필 이미지 URL 저장
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { profile_image_url: fileName },
+      data: {
+        profile_image_url: fileName,
+        profile_image_updated_at: new Date(),
+      },
     });
 
     return sendSuccess(res, 200, "프로필 이미지가 업로드되었습니다.", {
