@@ -13,7 +13,7 @@ const prisma =
   });
 
 // 개발 환경에서 연결 상태 모니터링 및 유지
-if (env.NODE_ENV === "development") {
+if (env.NODE_ENV === "development" || env.NODE_ENV === "production") {
   let connectionCheckCount = 0;
 
   // 주기적으로 연결 상태 확인 및 유지 (2분마다)
@@ -54,7 +54,7 @@ if (env.NODE_ENV === "development") {
         );
       }
     }
-  }, 120000); // 2분마다 확인 (연결 유지)
+  }, 60000); // 1분마다 확인 (연결 유지)
 }
 
 if (env.NODE_ENV !== "production") {

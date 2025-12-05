@@ -1,6 +1,5 @@
 import Redis from "ioredis";
 import { env } from "./env";
-import logger from "./logger";
 
 const redis = new Redis({
   host: env.REDIS_HOST,
@@ -9,11 +8,11 @@ const redis = new Redis({
 });
 
 redis.on("connect", () => {
-  logger.info(`✅ Redis connected to ${env.REDIS_HOST}:${env.REDIS_PORT}`);
+  console.log(`✅ Redis connected to ${env.REDIS_HOST}:${env.REDIS_PORT}`);
 });
 
 redis.on("error", (err: Error) => {
-  logger.error(`❌ Redis Error: ${err.message}`);
+  console.error(`❌ Redis Error: ${err.message}`);
 });
 
 export default redis;

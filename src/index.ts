@@ -1,8 +1,8 @@
 import http from "http";
-import app from "./app.js";
-import { env } from "./config/env.js";
-import prisma from "./config/prisma.js";
-import redis from "./config/redis.js";
+import app from "./app";
+import { env } from "./config/env";
+import prisma from "./config/prisma";
+import redis from "./config/redis";
 
 const server = http.createServer(app);
 

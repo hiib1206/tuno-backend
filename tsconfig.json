@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022", // 컴파일 결과 JS의 ECMAScript 버전
-    "module": "CommonJS", // 컴파일에서 ts -> js로 변환할 때 모듈 시스템 방식
+    "module": "ESNext", // 컴파일에서 ts -> js로 변환할 때 모듈 시스템 방식. esm이면 esm으로 써야함.
     "moduleResolution": "node", // 모듈 해석 방법 (Node.js 방식)
     "rootDir": "src", // 소스 파일의 루트 디렉토리
     "outDir": "dist", // 컴파일된 파일이 생성될 디렉토리

@@ -9,6 +9,7 @@ const envSchema = z.object({
   // 여기에 검증 할거 추가.
   NODE_ENV: z.enum(["development", "production", "test"]),
   PORT: z.coerce.number().min(1000).max(65535),
+  FRONTEND_URL: z.string().min(1),
 
   // database
   DATABASE_URL: z.string().min(1),
@@ -31,6 +32,10 @@ const envSchema = z.object({
   // firebase
   FIREBASE_CREDENTIAL: z.string().min(1),
   FIREBASE_STORAGE_BUCKET: z.string().min(1),
+
+  // Google OAuth Client
+  GOOGLE_CLIENT_ID: z.string().min(1),
+  GOOGLE_CLIENT_SECRET: z.string().min(1),
 });
 
 // 환경변수 검증 및 타입 추론
