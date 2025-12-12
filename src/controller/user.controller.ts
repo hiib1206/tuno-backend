@@ -10,18 +10,19 @@ import {
   sendVerificationEmail,
 } from "../utils/email";
 import { sendError, sendSuccess } from "../utils/response";
+import { UserPayload } from "../utils/token";
 import { toUserResponse } from "../utils/user";
 
 // me
 export const me = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { userId } = req.user!;
+    const { userId } = req.user as UserPayload;
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user || !user?.is_active) {
-      return sendError(res, 400, "사용자를 찾을 수 없습니다.");
+      return sendError(res, 401, "사용자를 찾을 수 없습니다.");
     }
 
     return sendSuccess(res, 200, "내 정보를 조회했습니다.", {
@@ -92,7 +93,7 @@ export const changeNickname = async (
   next: NextFunction
 ) => {
   try {
-    const { userId } = req.user!;
+    const { userId } = req.user as UserPayload;
     const { nick } = req.body;
 
     if (!nick) {
@@ -127,7 +128,7 @@ export const uploadProfileImage = async (
   next: NextFunction
 ) => {
   try {
-    const { userId } = req.user!;
+    const { userId } = req.user as UserPayload;
     const file = req.file;
 
     if (!file) {
@@ -191,7 +192,7 @@ export const requestEmailVerification = async (
   next: NextFunction
 ) => {
   try {
-    const { userId } = req.user!;
+    const { userId } = req.user as UserPayload;
     const { email } = req.body;
 
     // 이메일 중복 확인
@@ -241,7 +242,7 @@ export const verifyEmailCode = async (
   next: NextFunction
 ) => {
   try {
-    const { userId } = req.user!;
+    const { userId } = req.user as UserPayload;
     const { email, code } = req.body;
 
     // 인증 코드 조회 (userId와 email로만 조회, code는 나중에 확인)
@@ -324,7 +325,7 @@ export const resendEmailVerification = async (
   next: NextFunction
 ) => {
   try {
-    const { userId } = req.user!;
+    const { userId } = req.user as UserPayload;
     const { email } = req.body;
 
     // 기존 코드 삭제
@@ -364,7 +365,7 @@ export const changePassword = async (
   next: NextFunction
 ) => {
   try {
-    const { userId } = req.user!;
+    const { userId } = req.user as UserPayload;
     const { oldPw, newPw } = req.body;
 
     const user = await prisma.user.findUnique({
@@ -373,6 +374,14 @@ export const changePassword = async (
 
     if (!user || !user?.is_active) {
       return sendError(res, 400, "사용자를 찾을 수 없습니다.");
+    }
+
+    if (!user.pw) {
+      return sendError(
+        res,
+        400,
+        "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."
+      );
     }
 
     const isPasswordValid = await bcrypt.compare(oldPw, user.pw);

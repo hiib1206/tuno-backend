@@ -16,7 +16,7 @@ const prisma =
 if (env.NODE_ENV === "development" || env.NODE_ENV === "production") {
   let connectionCheckCount = 0;
 
-  // 주기적으로 연결 상태 확인 및 유지 (2분마다)
+  // 주기적으로 연결 상태 확인 및 유지 (1분마다)
   // 이렇게 하면 연결이 끊어지기 전에 계속 사용 중임을 알려줌
   setInterval(async () => {
     try {
@@ -30,6 +30,10 @@ if (env.NODE_ENV === "development" || env.NODE_ENV === "production") {
       if (duration > 50) {
         logger.warn(
           `[PRISMA CONNECTION SLOW] ${duration}ms (check #${connectionCheckCount})`
+        );
+      } else {
+        logger.info(
+          `[PRISMA CONNECTION FAST] ${duration}ms (check #${connectionCheckCount})`
         );
       }
     } catch (error) {

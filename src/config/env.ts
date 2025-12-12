@@ -36,6 +36,12 @@ const envSchema = z.object({
   // Google OAuth Client
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1),
+  // Naver OAuth Client
+  NAVER_CLIENT_ID: z.string().min(1),
+  NAVER_CLIENT_SECRET: z.string().min(1),
+  // Kakao OAuth Client
+  KAKAO_CLIENT_ID: z.string().min(1),
+  KAKAO_CLIENT_SECRET: z.string().min(1),
 });
 
 // 환경변수 검증 및 타입 추론
