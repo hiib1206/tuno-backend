@@ -5,11 +5,11 @@ import path from "node:path";
 import { env } from "../config/env";
 import { firebaseStorage } from "../config/firebase";
 import prisma from "../config/prisma";
+import { sendError, sendSuccess } from "../utils/commonResponse";
 import {
   generateVerificationCode,
   sendVerificationEmail,
 } from "../utils/email";
-import { sendError, sendSuccess } from "../utils/response";
 import { UserPayload } from "../utils/token";
 import { toUserResponse } from "../utils/user";
 
@@ -141,23 +141,18 @@ export const uploadProfileImage = async (
       select: { profile_image_url: true },
     });
 
-    let fileName: string;
+    // 기존 이미지 URL 저장 (나중에 삭제하기 위해)
+    const oldImageUrl = currentUser?.profile_image_url;
 
+    // 새 파일명 생성 (항상 새로 생성)
     const ext = path.extname(file.originalname); // ".png"
-    if (currentUser?.profile_image_url) {
-      // 기존 프로필 이미지가 있으면 같은 파일명 사용 (확장자만 업데이트)
-      const existingExt = path.extname(currentUser.profile_image_url); // ".png"
-      fileName = currentUser.profile_image_url.replace(existingExt, ext); // 확장자만 교체
-    } else {
-      // 기존 프로필 이미지가 없으면 새로 생성
-      const uuid = randomUUID();
-      fileName = `profile-image/${userId}/${uuid}${ext}`; // "profile-image/1/uuid.png"
-    }
+    const uuid = randomUUID();
+    const fileName = `profile-image/${userId}/${uuid}${ext}`; // "profile-image/1/uuid.png"
 
     // Firebase Storage 파일 참조 생성
     const fileRef = firebaseStorage.file(fileName);
 
-    // 파일 업로드 (기존 파일이 있으면 덮어쓰기)
+    // 새 이미지 업로드
     await fileRef.save(file.buffer, {
       metadata: {
         contentType: file.mimetype,
@@ -165,17 +160,37 @@ export const uploadProfileImage = async (
       public: true,
     });
 
-    // 공개 URL 생성 : https://storage.googleapis.com/[bucket-name]/profile-image/[userId]/[uuid].[ext]
-    // const imageUrl = fileRef.publicUrl();
-
     // DB에 프로필 이미지 URL 저장
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        profile_image_url: fileName,
-        profile_image_updated_at: new Date(),
-      },
-    });
+    let user;
+    try {
+      user = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          profile_image_url: fileName,
+          profile_image_updated_at: new Date(),
+        },
+      });
+    } catch (dbError) {
+      // DB 업데이트 실패 시 새로 업로드한 이미지 삭제
+      try {
+        await fileRef.delete();
+      } catch (deleteError) {
+        console.error("DB 업데이트 실패 후 새 이미지 삭제 실패:", deleteError);
+      }
+      // 원래 에러를 다시 던져서 상위 catch에서 처리
+      throw dbError;
+    }
+
+    // 기존 이미지 삭제 (모든 작업이 성공한 후)
+    if (oldImageUrl) {
+      try {
+        const oldFileRef = firebaseStorage.file(oldImageUrl);
+        await oldFileRef.delete();
+      } catch (deleteError) {
+        // 삭제 실패해도 에러를 던지지 않음 (이미 새 이미지 업로드 및 DB 업데이트 완료)
+        console.error("기존 프로필 이미지 삭제 실패:", deleteError);
+      }
+    }
 
     return sendSuccess(res, 200, "프로필 이미지가 업로드되었습니다.", {
       user: toUserResponse(user),
@@ -396,6 +411,54 @@ export const changePassword = async (
     });
 
     return sendSuccess(res, 200, "비밀번호가 변경되었습니다.");
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 커뮤니티 통계 조회
+export const getUserCommunityStats = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.user as UserPayload;
+
+    // 세 개의 count 쿼리를 병렬로 실행
+    const [postCount, commentCount, likeCount] = await Promise.all([
+      // 나의 게시글 개수 (삭제되지 않은 것만)
+      prisma.post.count({
+        where: {
+          author_id: userId,
+          deleted_at: null,
+        },
+      }),
+      // 나의 댓글 개수 (삭제되지 않은 것만)
+      prisma.post_comment.count({
+        where: {
+          author_id: userId,
+          deleted_at: null,
+        },
+      }),
+      // 내가 보낸 좋아요 개수 (삭제되지 않은 게시글만)
+      prisma.post_like.count({
+        where: {
+          user_id: userId,
+          post: {
+            deleted_at: null, // 삭제되지 않은 게시글만 카운트
+          },
+        },
+      }),
+    ]);
+
+    return sendSuccess(res, 200, "커뮤니티 통계를 조회했습니다.", {
+      stats: {
+        postCount,
+        commentCount,
+        likeCount,
+      },
+    });
   } catch (error) {
     next(error);
   }

@@ -3,7 +3,8 @@ import fs from "fs";
 import path from "path";
 import prisma from "../config/prisma";
 import redis from "../config/redis";
-import { sendError, sendSuccess } from "../utils/response";
+import { sendError, sendSuccess } from "../utils/commonResponse";
+import { UserPayload } from "../utils/token";
 import { toUserResponse } from "../utils/user";
 
 // access token 검증 테스트
@@ -13,7 +14,7 @@ export const testAccessToken = async (
   next: NextFunction
 ) => {
   try {
-    const { userId } = req.user!;
+    const { userId } = req.user as UserPayload;
     return sendSuccess(res, 200, "access token 검증 테스트가 완료되었습니다.", {
       userId,
     });

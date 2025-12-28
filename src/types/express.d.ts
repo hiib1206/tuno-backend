@@ -7,6 +7,11 @@ declare global {
       user?: UserPayload | Profile;
       refreshToken?: string;
       deviceId?: string;
+      validated?: {
+        body?: any;
+        query?: any;
+        params?: any;
+      };
     }
   }
 }

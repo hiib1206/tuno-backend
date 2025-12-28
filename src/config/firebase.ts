@@ -19,15 +19,3 @@ if (!admin.apps.length) {
 
 // Firebase Storage 인스턴스 생성 (Storage 사용시)
 export const firebaseStorage = admin.storage().bucket();
-
-/**
- * Firebase Storage 상대 경로를 전체 공개 URL로 변환
- * @param filePath 상대 경로 (예: "profile-image/1/uuid.png")
- * @returns 전체 URL (예: "https://storage.googleapis.com/bucket-name/profile-image/1/uuid.png")
- */
-export const getStoragePublicUrl = (
-  filePath: string | null | undefined
-): string | null => {
-  if (!filePath) return null;
-  return `https://storage.googleapis.com/${env.FIREBASE_STORAGE_BUCKET}/${filePath}`;
-};

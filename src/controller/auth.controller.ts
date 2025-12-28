@@ -6,8 +6,8 @@ import { env } from "../config/env";
 import passport from "../config/passport";
 import prisma from "../config/prisma";
 import { generateOAuthState, verifyOAuthState } from "../utils/auth";
+import { sendError, sendSuccess } from "../utils/commonResponse";
 import { getClientIp, getDeviceId, getUserAgent } from "../utils/request";
-import { sendError, sendSuccess } from "../utils/response";
 import {
   clearRefreshTokenCookie,
   deleteRefreshToken,

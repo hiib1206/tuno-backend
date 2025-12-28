@@ -1,5 +1,5 @@
-import { getStoragePublicUrl } from "../config/firebase";
 import { userModel } from "../generated/prisma/models/user";
+import { toPublicUrl } from "./firebase";
 
 /**
  * User 객체를 응답용으로 변환
@@ -11,6 +11,6 @@ export const toUserResponse = (user: userModel) => {
 
   return {
     ...userWithoutPw,
-    profile_image_url: getStoragePublicUrl(profile_image_url),
+    profile_image_url: toPublicUrl(profile_image_url),
   };
 };

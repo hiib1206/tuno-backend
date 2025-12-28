@@ -6,6 +6,9 @@ import { optionalDeviceIdMiddleware } from "./middleware/deviceId.middleware";
 import { errorHandler } from "./middleware/error.middleware";
 import morganMiddleware from "./middleware/morgan.middleware";
 import authRouter from "./route/auth.route";
+import newsRouter from "./route/news.route";
+import postCommentRouter from "./route/post-comment.route";
+import postRouter from "./route/post.route";
 import testRouter from "./route/test.route";
 import userRouter from "./route/user.route";
 const app = express();
@@ -35,6 +38,9 @@ app.use(optionalDeviceIdMiddleware); // 전역: x-device-id 선택적 검증 (�
 app.use("/api/test", testRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
+app.use("/api/post", postRouter);
+app.use("/api/comment", postCommentRouter);
+app.use("/api/news", newsRouter);
 
 // Error Handling
 app.use(errorHandler);

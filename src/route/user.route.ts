@@ -4,6 +4,7 @@ import {
   changePassword,
   checkNickname,
   checkUsername,
+  getUserCommunityStats,
   me,
   requestEmailVerification,
   resendEmailVerification,
@@ -52,6 +53,12 @@ userRouter.patch(
   verifyAccessTokenMiddleware,
   validateMiddleware({ body: changePasswordSchema }),
   changePassword
+);
+// GET api/user/community/stats
+userRouter.get(
+  "/community/stats",
+  verifyAccessTokenMiddleware,
+  getUserCommunityStats
 );
 
 export default userRouter;

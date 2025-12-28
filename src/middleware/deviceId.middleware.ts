@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { env } from "../config/env";
-import { sendError } from "../utils/response";
+import { sendError } from "../utils/commonResponse";
 
 // UUID 형식 검증 (모든 UUID 버전 지원)
 const uuidRegex =

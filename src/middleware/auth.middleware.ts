@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
-import { sendError } from "../utils/response";
+import { sendError } from "../utils/commonResponse";
 import {
   clearRefreshTokenCookie,
   getRefreshToken,
@@ -30,6 +30,40 @@ export const verifyAccessTokenMiddleware = (
     }
 
     // decoded: { userId: number }
+    const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET) as UserPayload;
+    req.user = decoded;
+    next();
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return sendError(res, 401, "만료된 access token입니다.");
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      return sendError(res, 401, "유효하지 않은 access token입니다.");
+    }
+    next(error);
+  }
+};
+
+// 선택적 access token 검증 (토큰이 있으면 검증, 없으면 통과)
+export const optionalVerifyAccessTokenMiddleware = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authHeader = req.headers.authorization;
+    // authorization header가 없으면 그냥 넘어감
+    if (!authHeader) {
+      return next();
+    }
+
+    const [bearer, token] = authHeader.split(" ");
+    // Bearer 형식이 아니거나 토큰이 없으면 그냥 넘어감
+    if (bearer !== "Bearer" || !token) {
+      return next();
+    }
+
+    // 토큰 검증 시도
     const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET) as UserPayload;
     req.user = decoded;
     next();

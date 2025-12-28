@@ -79,7 +79,7 @@ export const saveRefreshToken = async (
   // 기존 토큰이 있다면 인덱스에서 먼저 삭제
   // 사용중인 redis 저장구조
   // key: refresh_token:userId:deviceId
-  // value: { token: hashedToken, ua: userAgent, ip: ip }
+  // value: { token: hashedToken, ua: userAgent, ip: ip, createdAt: ISOString }
   // indexKey: refresh_token_index:hashedToken
   const existingData = await redis.hgetall(key);
   if (existingData && existingData.token) {
@@ -92,6 +92,7 @@ export const saveRefreshToken = async (
     token: hashedToken,
     ua: userAgent,
     ip: ip,
+    createdAt: new Date().toISOString(),
   });
   await redis.expire(key, expireSeconds);
 
@@ -126,12 +127,17 @@ export const getRefreshToken = async (
   userId: number,
   deviceId: string,
   refreshToken: string
-): Promise<{ token: string; ua: string; ip: string } | null> => {
+): Promise<{
+  token: string;
+  ua: string;
+  ip: string;
+  createdAt: string;
+} | null> => {
   // key: refresh_token:userId:deviceId
   const key = getRefreshTokenKey(userId, deviceId);
   const hashedToken = hashRefreshToken(refreshToken);
 
-  // data: { token: hashedToken, ua: userAgent, ip: ip } or (데이터가 없으면 null)
+  // data: { token: hashedToken, ua: userAgent, ip: ip, createdAt: ISOString } or (데이터가 없으면 null)
   const data = await redis.hgetall(key);
   if (!data || Object.keys(data).length === 0) {
     return null;
@@ -145,6 +151,7 @@ export const getRefreshToken = async (
     token: data.token,
     ua: data.ua,
     ip: data.ip,
+    createdAt: data.createdAt,
   };
 };
 
