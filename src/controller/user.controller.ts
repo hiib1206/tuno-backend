@@ -19,6 +19,7 @@ export const me = async (req: Request, res: Response, next: NextFunction) => {
     const { userId } = req.user as UserPayload;
     const user = await prisma.user.findUnique({
       where: { id: userId },
+      include: { auth_providers: true },
     });
 
     if (!user || !user?.is_active) {

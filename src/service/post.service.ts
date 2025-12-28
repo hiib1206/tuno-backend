@@ -67,8 +67,6 @@ export const getPostListService = async (
         MATCH(p.title, p.content) AGAINST(${searchTerm} IN BOOLEAN MODE) as relevance,
         JSON_OBJECT(
           'id', u.id,
-          'provider', u.provider,
-          'provider_id', u.provider_id,
           'username', u.username,
           'nick', u.nick,
           'phone', u.phone,

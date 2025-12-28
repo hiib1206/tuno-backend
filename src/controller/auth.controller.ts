@@ -5,6 +5,7 @@ import type { Profile } from "passport-google-oauth20";
 import { env } from "../config/env";
 import passport from "../config/passport";
 import prisma from "../config/prisma";
+import { AUTH_PROVIDERS } from "../types/auth-provider";
 import { generateOAuthState, verifyOAuthState } from "../utils/auth";
 import { sendError, sendSuccess } from "../utils/commonResponse";
 import { getClientIp, getDeviceId, getUserAgent } from "../utils/request";
@@ -101,6 +102,12 @@ export const register = async (
         username,
         pw: hashedPw,
         nick,
+        auth_providers: {
+          create: {
+            provider: AUTH_PROVIDERS.LOCAL,
+            provider_user_id: null,
+          },
+        },
       },
     });
 
@@ -332,18 +339,20 @@ export const googleCallback = async (
 
     const email = profile.emails[0].value;
     const displayName = profile.displayName || email.split("@")[0];
-    const provider = profile.provider;
+    const provider = AUTH_PROVIDERS.GOOGLE;
     const providerId = profile.id;
 
     // 1단계: provider + provider_id로 조회 (이미 소셜 계정이 연결된 경우)
-    let user = await prisma.user.findUnique({
+    const authProvider = await prisma.auth_provider.findUnique({
       where: {
-        provider_provider_id: {
+        provider_provider_user_id: {
           provider,
-          provider_id: providerId,
+          provider_user_id: providerId,
         },
       },
+      include: { user: true },
     });
+    let user = authProvider?.user ?? null;
 
     // 2단계: email로 조회 (일반 회원가입 사용자와 통합)
     if (!user && email) {
@@ -357,10 +366,14 @@ export const googleCallback = async (
         user = await prisma.user.update({
           where: { id: user.id },
           data: {
-            provider,
-            provider_id: providerId,
             // email_verified_at이 없으면 설정 (소셜 로그인은 인증 완료)
             email_verified_at: user.email_verified_at || new Date(),
+            auth_providers: {
+              create: {
+                provider,
+                provider_user_id: providerId,
+              },
+            },
           },
         });
       }
@@ -368,21 +381,22 @@ export const googleCallback = async (
 
     // 3단계: 신규 사용자 생성
     if (!user) {
-      // username과 nick은 중복 방지를 위해 랜덤 문자열 추가
-      // 예) username_a4f3, nick_a4f3
-      const base = email.split("@")[0];
+      // nick은 중복 방지를 위해 랜덤 문자열 추가
+      // 예) nick_a4f3
       const shortId = crypto.randomBytes(4).toString("hex");
-      const username = `${base}_${shortId}`;
       const nick = `${displayName}_${shortId}`;
 
       user = await prisma.user.create({
         data: {
-          provider,
-          provider_id: providerId,
-          username,
           email,
           nick,
           email_verified_at: new Date(), // Google 로그인은 이메일이 이미 인증됨
+          auth_providers: {
+            create: {
+              provider,
+              provider_user_id: providerId,
+            },
+          },
         },
       });
     }
@@ -484,36 +498,39 @@ export const naverCallback = async (
       );
     }
 
-    const provider = profile.provider;
+    const provider = AUTH_PROVIDERS.NAVER;
     const providerId = profile.id;
     // 네이버는 profile.email이 연락처용 이메일이므로 신뢰할 수 없음
     const displayName = profile.nickname || profile.name || `user`;
 
-    // 1단계: provider + provider_id로만 조회
-    // Naver는 email 기반 통합을 하지 않음 (email이 연락처용이므로 신뢰 불가)
-    let user = await prisma.user.findUnique({
+    // 1단계: provider + provider_id로 조회 (이미 소셜 계정이 연결된 경우)
+    const authProvider = await prisma.auth_provider.findUnique({
       where: {
-        provider_provider_id: {
+        provider_provider_user_id: {
           provider,
-          provider_id: providerId,
+          provider_user_id: providerId,
         },
       },
+      include: { user: true },
     });
+    let user = authProvider?.user ?? null;
 
     // 2단계: 신규 사용자 생성
+    // Naver는 email 기반 통합을 하지 않음 (email이 연락처용이므로 신뢰 불가)
     if (!user) {
-      // username과 nick 생성 (email이 없을 수 있으므로 providerId 기반으로 생성)
-      const base = `naver`;
+      // nick은 중복 방지를 위해 랜덤 문자열 추가
       const shortId = crypto.randomBytes(4).toString("hex");
-      const username = `${base}_${shortId}`;
       const nick = `${displayName}_${shortId}`;
 
       user = await prisma.user.create({
         data: {
-          provider,
-          provider_id: providerId,
-          username,
           nick,
+          auth_providers: {
+            create: {
+              provider,
+              provider_user_id: providerId,
+            },
+          },
         },
       });
     }
@@ -615,36 +632,39 @@ export const kakaoCallback = async (
       );
     }
 
-    const provider = profile.provider;
+    const provider = AUTH_PROVIDERS.KAKAO;
     const providerId = String(profile.id); // 숫자로 올 수 있으므로 문자열로 변환
     // 카카오는 이메일을 제공할 수 있지만 신뢰할 수 없으므로 email 기반 통합을 하지 않음
     const displayName = profile.displayName || profile.username || `kakao`;
 
-    // 3. 1단계: provider + provider_id로만 조회
-    // Kakao는 email 기반 통합을 하지 않음 (email이 신뢰할 수 없을 수 있음)
-    let user = await prisma.user.findUnique({
+    // 1단계: provider + provider_id로 조회 (이미 소셜 계정이 연결된 경우)
+    const authProvider = await prisma.auth_provider.findUnique({
       where: {
-        provider_provider_id: {
+        provider_provider_user_id: {
           provider,
-          provider_id: providerId,
+          provider_user_id: providerId,
         },
       },
+      include: { user: true },
     });
+    let user = authProvider?.user ?? null;
 
-    // 4. 2단계: 신규 사용자 생성
+    // 2단계: 신규 사용자 생성
+    // Kakao는 email 기반 통합을 하지 않음 (email이 신뢰할 수 없을 수 있음)
     if (!user) {
-      // username과 nick 생성 (email이 없을 수 있으므로 providerId 기반으로 생성)
-      const base = `kakao`;
+      // nick은 중복 방지를 위해 랜덤 문자열 추가
       const shortId = crypto.randomBytes(4).toString("hex");
-      const username = `${base}_${shortId}`;
       const nick = `${displayName}_${shortId}`;
 
       user = await prisma.user.create({
         data: {
-          provider,
-          provider_id: providerId,
-          username,
           nick,
+          auth_providers: {
+            create: {
+              provider,
+              provider_user_id: providerId,
+            },
+          },
         },
       });
     }

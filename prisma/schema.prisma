@@ -42,30 +42,50 @@ model kospi_master {
 }
 
 model user {
-  id                       Int                       @id @default(autoincrement())
-  provider                 String?                   @db.VarChar(30)        // "google" | "naver" | "kakao" 등
-  provider_id              String?                   @db.VarChar(255)       // 외부 서비스의 고유 사용자 ID
-  username                 String                    @unique(map: "User_username_key") @db.VarChar(255)
-  pw                       String?                   @db.VarChar(255)
-  nick                     String                    @unique(map: "User_nick_key") @db.VarChar(50)
-  phone                    String?                   @unique(map: "User_phone_key") @db.VarChar(30)
-  address                  String?                   @db.VarChar(400)
-  role                     user_role                 @default(USER)
-  email                    String?                   @unique(map: "User_email_key") @db.VarChar(255)
-  email_verified_at        DateTime?
-  email_verification_code  email_verification_code[]
-  profile_image_url        String?                   @db.VarChar(255)
-  profile_image_updated_at DateTime?
-  is_active                user_is_active            @default(Y)
-  created_at               DateTime                  @default(now())
-  updated_at               DateTime                  @updatedAt
+  id                       Int        @id @default(autoincrement())
 
-  posts        post[]
-  post_comments post_comment[]
-  post_likes   post_like[]
+  username                 String?     @unique(map: "User_username_key") @db.VarChar(255)
+  pw                       String?    @db.VarChar(255)         // local 비밀번호 (없으면 null)
+
+  nick                     String     @unique(map: "User_nick_key") @db.VarChar(50)
+  phone                    String?    @unique(map: "User_phone_key") @db.VarChar(30)
+  address                  String?    @db.VarChar(400)
+
+  email                    String?    @unique(map: "User_email_key") @db.VarChar(255)
+  email_verified_at        DateTime?
+
+  role                     user_role  @default(USER)
+  profile_image_url        String?     @db.VarChar(255)
+  profile_image_updated_at DateTime?
+  is_active                user_is_active @default(Y)
+
+  created_at               DateTime   @default(now())
+  updated_at               DateTime   @updatedAt
+
+  // relations
+  auth_providers           auth_provider[]
+  posts                    post[]
+  post_comments            post_comment[]
+  post_likes               post_like[]
+  email_verification_codes email_verification_code[]
 
   @@index([is_active], map: "User_is_active_idx")
-  @@unique([provider, provider_id], map: "User_provider_unique") // 소셜 유저 중복 방지 (provider가 null이면 여러 개 가능)
+}
+
+model auth_provider {
+  id                Int      @id @default(autoincrement())
+  user_id           Int
+  provider           String   @db.VarChar(30) // AuthProvider 타입: 'local' | 'naver' | 'kakao' | 'google' 등
+  provider_user_id   String?  @db.VarChar(255) // 소셜 user id (local은 null 가능)
+  created_at         DateTime @default(now())
+  updated_at         DateTime   @updatedAt
+
+  user user @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, provider], map: "AuthProvider_user_provider_unique")              // 한 유저당 provider 1개
+  @@unique([provider, provider_user_id], map: "AuthProvider_provider_user_unique")     // 소셜 계정 중복 연결 방지
+  @@index([provider], map: "AuthProvider_provider_idx")
+  @@index([user_id], map: "AuthProvider_user_id_idx")
 }
 
 enum user_role {
