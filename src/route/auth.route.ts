@@ -12,13 +12,38 @@ import {
   naverCallback,
   refresh,
   register,
+  resendEmailVerification,
+  sendEmailVerification,
+  verifyEmail,
 } from "../controller/auth.controller";
 import { verifyRefreshTokenMiddleware } from "../middleware/auth.middleware";
 import { validateMiddleware } from "../middleware/validation.middleware";
-import { registerSchema } from "../schema/auth.schema";
+import {
+  emailVerificationSchema,
+  registerSchema,
+  verifyEmailSchema,
+} from "../schema/auth.schema";
 
 const authRouter = Router();
 
+// POST api/auth/email/send - 이메일 인증 코드 발송
+authRouter.post(
+  "/email/send",
+  validateMiddleware({ body: emailVerificationSchema }),
+  sendEmailVerification
+);
+// POST api/auth/email/resend - 이메일 인증 코드 재발송
+authRouter.post(
+  "/email/resend",
+  validateMiddleware({ body: emailVerificationSchema }),
+  resendEmailVerification
+);
+// POST api/auth/email/verify - 이메일 인증 검증 (signupToken 발급)
+authRouter.post(
+  "/email/verify",
+  validateMiddleware({ body: verifyEmailSchema }),
+  verifyEmail
+);
 // POST api/auth/register
 authRouter.post(
   "/register",

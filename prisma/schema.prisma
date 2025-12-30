@@ -9,20 +9,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model email_verification_code {
-  id         Int      @id @default(autoincrement())
-  user_id    Int
-  new_email  String?  @db.VarChar(255)
-  code       String   @db.VarChar(10)
-  expires_at DateTime
-  attempts   Int      @default(0)
-  created_at DateTime @default(now())
-  user       user     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([code])
-  @@index([user_id])
-}
-
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model kospi_master {
   id                 Int       @id @default(autoincrement())
@@ -67,7 +53,6 @@ model user {
   posts                    post[]
   post_comments            post_comment[]
   post_likes               post_like[]
-  email_verification_codes email_verification_code[]
 
   @@index([is_active], map: "User_is_active_idx")
 }

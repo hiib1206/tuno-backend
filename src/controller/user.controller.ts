@@ -2,9 +2,9 @@ import bcrypt from "bcrypt";
 import { NextFunction, Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { env } from "../config/env";
 import { firebaseStorage } from "../config/firebase";
 import prisma from "../config/prisma";
+import redis from "../config/redis";
 import { sendError, sendSuccess } from "../utils/commonResponse";
 import {
   generateVerificationCode,
@@ -201,140 +201,63 @@ export const uploadProfileImage = async (
   }
 };
 
-// 이메일 인증 코드 요청
-export const requestEmailVerification = async (
+// 이메일 인증 요청 (마이페이지)
+export const sendEmailVerification = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { userId } = req.user as UserPayload;
-    const { email } = req.body;
+    const { email } = req.validated?.body;
 
-    // 이메일 중복 확인
+    // 이메일 중복 확인 (현재 사용자 제외)
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
-    if (existingUser && existingUser.id !== userId) {
+    if (existingUser) {
+      if (existingUser.id === userId) {
+        return sendError(
+          res,
+          400,
+          "현재 사용 중인 이메일입니다. 다른 이메일을 입력해주세요."
+        );
+      }
       return sendError(res, 400, "이미 사용 중인 이메일입니다.");
     }
 
-    // 기존 인증 코드가 있으면 삭제
-    await prisma.email_verification_code.deleteMany({
-      where: { user_id: userId },
-    });
+    // 쿨타임 설정 (먼저 실행 - race condition 방지)
+    const resendKey = `email_verify_resend:${userId}`;
+    await redis.set(resendKey, "1", "EX", 60); // 60초
 
-    // 6자리 코드 생성
+    // 6자리 인증 코드 생성
     const code = generateVerificationCode();
-    const expiresAt = new Date(
-      Date.now() + Number(env.SENDGRID_EXPIRES_IN) * 60 * 1000
-    ); // SENDGRID_EXPIRES_IN(분) 후 만료
 
+    // 코드 해시 생성
+    const codeHash = await bcrypt.hash(code, 10);
+
+    // Redis에 저장할 데이터
+    const authData = {
+      email,
+      codeHash,
+      attempts: 0,
+    };
+
+    // Redis에 저장 (기존 데이터 덮어쓰기)
+    const redisKey = `email_verify:${userId}`;
+    await redis.set(redisKey, JSON.stringify(authData), "EX", 300); // 5분
+
+    // 이메일 발송
     await sendVerificationEmail(email, code);
 
-    // DB에 저장
-    const verificationRecord = await prisma.email_verification_code.create({
-      data: {
-        user_id: userId,
-        new_email: email,
-        code,
-        expires_at: expiresAt,
-      },
-    });
-
-    return sendSuccess(res, 200, "인증 코드가 이메일로 발송되었습니다.", {
-      expiresAt: verificationRecord.expires_at.toISOString(),
-    });
+    return sendSuccess(res, 200, "인증 코드가 이메일로 발송되었습니다.");
   } catch (error) {
     next(error);
   }
 };
 
-// 인증 코드 확인
-export const verifyEmailCode = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { userId } = req.user as UserPayload;
-    const { email, code } = req.body;
-
-    // 인증 코드 조회 (userId와 email로만 조회, code는 나중에 확인)
-    const verification = await prisma.email_verification_code.findFirst({
-      where: {
-        user_id: userId,
-        new_email: email,
-      },
-      orderBy: {
-        created_at: "desc",
-      },
-    });
-
-    if (!verification) {
-      return sendError(res, 400, "유효하지 않은 인증 코드입니다.");
-    }
-
-    // 만료 시간 확인
-    if (verification.expires_at < new Date()) {
-      await prisma.email_verification_code.delete({
-        where: { id: verification.id },
-      });
-      return sendError(
-        res,
-        400,
-        "입력시간이 초과 되었습니다. 재발송을 눌러주세요."
-      );
-    }
-
-    // 시도 횟수 확인 (최대 5회)
-    if (verification.attempts >= 5) {
-      await prisma.email_verification_code.delete({
-        where: { id: verification.id },
-      });
-      return sendError(
-        res,
-        400,
-        "인증 코드 시도 횟수를 초과했습니다. 재발송을 눌러주세요."
-      );
-    }
-
-    // 코드 일치 확인
-    if (verification.code !== code) {
-      // 시도 횟수 증가
-      const updatedVerification = await prisma.email_verification_code.update({
-        where: { id: verification.id },
-        data: { attempts: { increment: 1 } },
-      });
-      return sendError(
-        res,
-        400,
-        `인증 코드가 일치하지 않습니다. 시도 횟수 : ${updatedVerification.attempts}회 (최대 5회)`
-      );
-    }
-
-    // 성공: emailVerifiedAt 업데이트 및 인증 레코드 삭제
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: userId },
-        data: {
-          email: email,
-          email_verified_at: new Date(),
-        },
-      }),
-      prisma.email_verification_code.delete({
-        where: { id: verification.id },
-      }),
-    ]);
-
-    return sendSuccess(res, 200, "이메일 인증이 완료되었습니다.");
-  } catch (error) {
-    next(error);
-  }
-};
-
-// 인증 코드 재발송
+// 이메일 인증 재발송 (마이페이지)
 export const resendEmailVerification = async (
   req: Request,
   res: Response,
@@ -342,33 +265,133 @@ export const resendEmailVerification = async (
 ) => {
   try {
     const { userId } = req.user as UserPayload;
-    const { email } = req.body;
+    const { email } = req.validated?.body;
 
-    // 기존 코드 삭제
-    await prisma.email_verification_code.deleteMany({
-      where: { user_id: userId },
+    // 이메일 중복 확인 (현재 사용자 제외)
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
     });
 
-    // 새 코드 생성 및 발송 (requestEmailVerification과 동일한 로직)
-    const code = generateVerificationCode();
-    const expiresAt = new Date(
-      Date.now() + Number(env.SENDGRID_EXPIRES_IN) * 60 * 1000
-    ); // SENDGRID_EXPIRES_IN(분) 후 만료
+    if (existingUser) {
+      if (existingUser.id === userId) {
+        return sendError(
+          res,
+          400,
+          "현재 사용 중인 이메일입니다. 다른 이메일을 입력해주세요."
+        );
+      }
+      return sendError(res, 400, "이미 사용 중인 이메일입니다.");
+    }
 
+    // 1. 재발송 쿨타임 체크
+    const resendKey = `email_verify_resend:${userId}`;
+    if (await redis.exists(resendKey)) {
+      return sendError(res, 400, "60초 후 다시 시도해주세요.");
+    }
+
+    // 2. 쿨타임 설정 (먼저 실행 - race condition 방지)
+    await redis.set(resendKey, "1", "EX", 60); // 60초
+
+    // 3. 새 인증 코드 생성
+    const code = generateVerificationCode();
+
+    // 4. 코드 해시 생성
+    const codeHash = await bcrypt.hash(code, 10);
+
+    // 5. 인증 정보 완전 초기화
+    const authData = {
+      email,
+      codeHash,
+      attempts: 0,
+    };
+
+    const redisKey = `email_verify:${userId}`;
+    await redis.set(redisKey, JSON.stringify(authData), "EX", 300); // 5분
+
+    // 6. 이메일 발송
     await sendVerificationEmail(email, code);
 
-    const verificationRecord = await prisma.email_verification_code.create({
+    return sendSuccess(res, 200, "인증 코드가 재전송되었습니다.");
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 이메일 인증 검증 (마이페이지)
+export const verifyEmail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.user as UserPayload;
+    const { code } = req.validated?.body;
+
+    // Redis에서 인증 데이터 조회
+    const redisKey = `email_verify:${userId}`;
+    const authDataString = await redis.get(redisKey);
+
+    // TTL 만료 여부 확인
+    if (!authDataString) {
+      return sendError(res, 400, "인증 코드가 만료되었거나 존재하지 않습니다.");
+    }
+
+    const authData = JSON.parse(authDataString);
+
+    // attempts >= 5 체크
+    if (authData.attempts >= 5) {
+      return sendError(
+        res,
+        400,
+        "최대 시도 횟수를 초과했습니다. 새로운 인증 코드를 발급받아주세요.",
+        {
+          attempts: authData.attempts,
+          maxAttempts: 5,
+        }
+      );
+    }
+
+    // 코드 검증
+    const isCodeValid = await bcrypt.compare(code, authData.codeHash);
+
+    if (!isCodeValid) {
+      // 실패 시 attempts + 1
+      authData.attempts += 1;
+
+      // 기존 TTL 유지하여 Redis 갱신
+      const ttl = await redis.ttl(redisKey);
+      // -2: 키가 없음, -1: 키는 있지만 TTL 없음
+      if (ttl > 0) {
+        await redis.set(redisKey, JSON.stringify(authData), "EX", ttl);
+      } else {
+        // TTL이 만료되었거나 설정되지 않은 경우 에러 반환
+        return sendError(
+          res,
+          400,
+          "인증 코드가 만료되었습니다. 새로운 인증 코드를 발급받아주세요."
+        );
+      }
+
+      return sendError(res, 400, "인증 코드가 일치하지 않습니다.", {
+        attempts: authData.attempts,
+        maxAttempts: 5,
+      });
+    }
+
+    // 성공 시 처리
+    // user.email 업데이트 및 email_verified_at 설정
+    await prisma.user.update({
+      where: { id: userId },
       data: {
-        user_id: userId,
-        new_email: email,
-        code,
-        expires_at: expiresAt,
+        email: authData.email,
+        email_verified_at: new Date(),
       },
     });
 
-    return sendSuccess(res, 200, "인증 코드가 재발송되었습니다.", {
-      expiresAt: verificationRecord.expires_at.toISOString(),
-    });
+    // Redis 즉시 삭제
+    await redis.del(redisKey);
+
+    return sendSuccess(res, 200, "이메일 인증이 완료되었습니다.");
   } catch (error) {
     next(error);
   }

@@ -6,7 +6,7 @@ type UserWithAuthProviders = userModel & {
   auth_providers?: Array<{
     id: number | null;
     user_id: number | null;
-    provider: AuthProvider;
+    provider: string;
     provider_user_id: string | null;
     created_at: Date;
     updated_at: Date | null;

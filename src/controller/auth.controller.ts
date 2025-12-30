@@ -5,9 +5,14 @@ import type { Profile } from "passport-google-oauth20";
 import { env } from "../config/env";
 import passport from "../config/passport";
 import prisma from "../config/prisma";
+import redis from "../config/redis";
 import { AUTH_PROVIDERS } from "../types/auth-provider";
 import { generateOAuthState, verifyOAuthState } from "../utils/auth";
 import { sendError, sendSuccess } from "../utils/commonResponse";
+import {
+  generateVerificationCode,
+  sendVerificationEmail,
+} from "../utils/email";
 import { getClientIp, getDeviceId, getUserAgent } from "../utils/request";
 import {
   clearRefreshTokenCookie,
@@ -77,8 +82,33 @@ export const register = async (
   next: NextFunction
 ) => {
   try {
-    const { username, pw, nick } = req.body;
+    const { username, pw, nick, email, signupToken } = req.validated?.body;
 
+    // 1. signupToken 검증 (이메일 인증 완료 여부 확인)
+    const redisKey = `email_auth:${email}`;
+    const authDataString = await redis.get(redisKey);
+
+    if (!authDataString) {
+      return sendError(
+        res,
+        400,
+        "이메일 인증이 만료되었습니다. 다시 인증해주세요."
+      );
+    }
+
+    const authData = JSON.parse(authDataString);
+
+    // 인증 완료 여부 확인
+    if (authData.verified !== true) {
+      return sendError(res, 400, "이메일 인증이 완료되지 않았습니다.");
+    }
+
+    // signupToken 일치 확인
+    if (authData.signupToken !== signupToken) {
+      return sendError(res, 400, "이메일 인증에 실패 하였습니다.");
+    }
+
+    // 2. 기존 사용자 확인
     const existingUsername = await prisma.user.findUnique({
       where: { username },
     });
@@ -95,13 +125,26 @@ export const register = async (
       return sendError(res, 400, "이미 존재하는 닉네임입니다.");
     }
 
+    // 이메일 중복 확인
+    const existingEmail = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingEmail) {
+      return sendError(res, 400, "이미 사용 중인 이메일입니다.");
+    }
+
+    // 3. 비밀번호 해시
     const hashedPw = await bcrypt.hash(pw, 10);
 
+    // 4. 사용자 생성 (이메일 및 인증 정보 포함)
     await prisma.user.create({
       data: {
         username,
         pw: hashedPw,
         nick,
+        email,
+        email_verified_at: new Date(), // 이메일 인증 완료
         auth_providers: {
           create: {
             provider: AUTH_PROVIDERS.LOCAL,
@@ -111,7 +154,185 @@ export const register = async (
       },
     });
 
+    // 5. 사용된 signupToken 무효화 (Redis에서 삭제)
+    await redis.del(redisKey);
+
     return sendSuccess(res, 201, "회원가입이 완료되었습니다.");
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 이메일 인증 요청
+export const sendEmailVerification = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { email } = req.validated?.body;
+
+    // 6자리 인증 코드 생성
+    const code = generateVerificationCode();
+
+    // 코드 해시 생성
+    const codeHash = await bcrypt.hash(code, 10);
+
+    // Redis에 저장할 데이터
+    const authData = {
+      codeHash,
+      verified: false,
+      signupToken: null,
+      attempts: 0,
+    };
+
+    // Redis에 저장 (기존 데이터 덮어쓰기)
+    const redisKey = `email_auth:${email}`;
+    await redis.set(redisKey, JSON.stringify(authData), "EX", 300); //5분
+
+    // 이메일 발송
+    await sendVerificationEmail(email, code);
+
+    return sendSuccess(res, 200, "인증 코드가 이메일로 발송되었습니다.");
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 이메일 인증 재발송
+export const resendEmailVerification = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { email } = req.validated?.body;
+
+    // 이메일 중복 확인
+    const existingEmail = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingEmail) {
+      return sendError(res, 400, "이미 사용 중인 이메일입니다.");
+    }
+
+    // 1. 재발송 쿨타임 체크
+    const resendKey = `email_auth_resend:${email}`;
+    if (await redis.exists(resendKey)) {
+      return sendError(res, 400, "60초 후 다시 시도해주세요.");
+    }
+
+    // 2. 쿨타임 설정 (먼저 실행 - race condition 방지)
+    await redis.set(resendKey, "1", "EX", 60); // 60초
+
+    // 3. 새 인증 코드 생성
+    const code = generateVerificationCode();
+
+    // 4. 코드 해시 생성
+    const codeHash = await bcrypt.hash(code, 10);
+
+    // 5. 인증 정보 초기화 (기존 코드/signupToken 완전 무효화)
+    const authData = {
+      codeHash,
+      verified: false,
+      signupToken: null,
+      attempts: 0,
+    };
+
+    const redisKey = `email_auth:${email}`;
+    await redis.set(redisKey, JSON.stringify(authData), "EX", 300); // 5분
+
+    // 6. 이메일 발송
+    await sendVerificationEmail(email, code);
+
+    return sendSuccess(res, 200, "인증 코드가 재전송되었습니다.");
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 이메일 인증 검증 (signupToken 발급)
+export const verifyEmail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { email, code } = req.validated?.body;
+
+    // Redis에서 인증 데이터 조회
+    const redisKey = `email_auth:${email}`;
+    const authDataString = await redis.get(redisKey);
+
+    // TTL 만료 여부 확인
+    if (!authDataString) {
+      return sendError(res, 400, "인증 코드가 만료되었거나 존재하지 않습니다.");
+    }
+
+    const authData = JSON.parse(authDataString);
+
+    // 이미 인증 완료된 경우 기존 signupToken 반환
+    if (authData.verified === true) {
+      return sendSuccess(res, 200, "이미 인증이 완료되었습니다.", {
+        signupToken: authData.signupToken,
+      });
+    }
+
+    // attempts >= 5 체크
+    if (authData.attempts >= 5) {
+      return sendError(
+        res,
+        400,
+        "최대 시도 횟수를 초과했습니다. 새로운 인증 코드를 발급받아주세요.",
+        {
+          attempts: authData.attempts,
+          maxAttempts: 5,
+        }
+      );
+    }
+
+    // 코드 검증
+    const isCodeValid = await bcrypt.compare(code, authData.codeHash);
+
+    if (!isCodeValid) {
+      // 실패 시 attempts + 1
+      authData.attempts += 1;
+
+      // 기존 TTL 유지하여 Redis 갱신
+      const ttl = await redis.ttl(redisKey);
+      // -2: 키가 없음, -1: 키는 있지만 TTL 없음
+      if (ttl > 0) {
+        await redis.set(redisKey, JSON.stringify(authData), "EX", ttl);
+      } else {
+        // TTL이 만료되었거나 설정되지 않은 경우 에러 반환
+        return sendError(
+          res,
+          400,
+          "인증 코드가 만료되었습니다. 새로운 인증 코드를 발급받아주세요."
+        );
+      }
+
+      return sendError(res, 400, "인증 코드가 일치하지 않습니다.", {
+        attempts: authData.attempts,
+        maxAttempts: 5,
+      });
+    }
+
+    // 성공 시 처리
+    authData.verified = true;
+
+    // signupToken 재발급 정책: 없을 때만 발급
+    if (!authData.signupToken) {
+      authData.signupToken = crypto.randomUUID();
+    }
+
+    // Redis 갱신 (TTL 300초로 리셋)
+    await redis.set(redisKey, JSON.stringify(authData), "EX", 300);
+
+    return sendSuccess(res, 200, "이메일 인증이 완료되었습니다.", {
+      signupToken: authData.signupToken,
+    });
   } catch (error) {
     next(error);
   }

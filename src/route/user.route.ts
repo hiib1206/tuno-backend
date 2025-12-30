@@ -6,15 +6,19 @@ import {
   checkUsername,
   getUserCommunityStats,
   me,
-  requestEmailVerification,
   resendEmailVerification,
+  sendEmailVerification,
   uploadProfileImage,
-  verifyEmailCode,
+  verifyEmail,
 } from "../controller/user.controller";
 import { verifyAccessTokenMiddleware } from "../middleware/auth.middleware";
 import { uploadProfileImageMiddleware } from "../middleware/multer.middleware";
 import { validateMiddleware } from "../middleware/validation.middleware";
-import { changePasswordSchema } from "../schema/user.schema";
+import {
+  changePasswordSchema,
+  userEmailVerificationSchema,
+  verifyUserEmailSchema,
+} from "../schema/user.schema";
 
 const userRouter = Router();
 
@@ -33,20 +37,6 @@ userRouter.post(
   uploadProfileImageMiddleware,
   uploadProfileImage
 );
-// POST api/user/email/request
-userRouter.post(
-  "/email/request",
-  verifyAccessTokenMiddleware,
-  requestEmailVerification
-);
-// POST api/user/email/verify
-userRouter.post("/email/verify", verifyAccessTokenMiddleware, verifyEmailCode);
-// POST api/user/email/resend
-userRouter.post(
-  "/email/resend",
-  verifyAccessTokenMiddleware,
-  resendEmailVerification
-);
 // patch api/user/password
 userRouter.patch(
   "/password",
@@ -59,6 +49,27 @@ userRouter.get(
   "/community/stats",
   verifyAccessTokenMiddleware,
   getUserCommunityStats
+);
+// POST api/user/email/send - 마이페이지 이메일 인증 요청
+userRouter.post(
+  "/email/send",
+  verifyAccessTokenMiddleware,
+  validateMiddleware({ body: userEmailVerificationSchema }),
+  sendEmailVerification
+);
+// POST api/user/email/verify - 마이페이지 이메일 인증 검증
+userRouter.post(
+  "/email/verify",
+  verifyAccessTokenMiddleware,
+  validateMiddleware({ body: verifyUserEmailSchema }),
+  verifyEmail
+);
+// POST api/user/email/resend - 마이페이지 이메일 인증 재발송
+userRouter.post(
+  "/email/resend",
+  verifyAccessTokenMiddleware,
+  validateMiddleware({ body: userEmailVerificationSchema }),
+  resendEmailVerification
 );
 
 export default userRouter;
