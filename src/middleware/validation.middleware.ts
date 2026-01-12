@@ -50,7 +50,7 @@ export const validateMiddleware =
 
       next();
     } catch (err) {
-      console.log("validateMiddleware 에러 발생:", err);
+      // console.log("validateMiddleware 에러 발생:", err);
       if (err instanceof ZodError) {
         const formattedErrors = formatZodError(err);
         return sendError(res, 400, formattedErrors);

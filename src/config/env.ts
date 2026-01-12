@@ -11,6 +11,10 @@ const envSchema = z.object({
   PORT: z.coerce.number().min(1000).max(65535),
   FRONTEND_URL: z.string().min(1),
 
+  // tuno-ai-api-server
+  TUNO_AI_API_BASE_URL: z.string().min(1),
+  TUNO_AI_API_SECRET_KEY: z.string().min(1),
+
   // database
   DATABASE_URL: z.string().min(1),
   // redis

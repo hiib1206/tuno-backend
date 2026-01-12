@@ -1,5 +1,6 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
+// @ts-ignore - ESM에서 CommonJS named export import
 import GoogleNewsDecoder from "google-news-decoder";
 import Parser from "rss-parser";
 
@@ -50,7 +51,7 @@ export function createTopicRssUrl(topicId: string): URL {
 /**
  * Google News 검색 결과 RSS URL을 생성합니다.
  * @param query - 검색어 (예: "삼성전자", "삼성전자 site:mk.co.kr")
- * @returns 검색 결과 RSS URL
+ * @returns 검색 결과 RSS URL (https://news.google.com/rss/search?hl=ko&gl=KR&ceid=KR%3Ako&q=삼성전자)
  * @example
  * // 일반 검색
  * const url = createSearchRssUrl("삼성전자");
@@ -150,6 +151,7 @@ export const getNewsWithThumbnail = async (googleUrl: string) => {
     const decoder = new GoogleNewsDecoder();
     const result = await decoder.decodeGoogleNewsUrl(googleUrl);
     const originalUrl = result.decodedUrl;
+
     if (!originalUrl) {
       return null;
     }
@@ -163,17 +165,67 @@ export const getNewsWithThumbnail = async (googleUrl: string) => {
 
     // 3. Cheerio로 썸네일(og:image) 추출
     const $ = cheerio.load(html);
-    const thumbnail =
-      $('meta[property="og:image"]').attr("content") ||
-      $('meta[name="twitter:image"]').attr("content") ||
-      ""; // 이미지가 없으면 빈 문자열
+
+    // og:image 전부 수집
+    const ogImages = $('meta[property="og:image"]')
+      .map((_, el) => $(el).attr("content"))
+      .get()
+      .filter(Boolean);
+
+    // twitter:image 전부 수집
+    const twitterImages = $('meta[name="twitter:image"]')
+      .map((_, el) => $(el).attr("content"))
+      .get()
+      .filter(Boolean);
+
+    // 후보군 합치기 (og:image 우선)
+    const candidates = [...ogImages, ...twitterImages];
+
+    // 뒤에서부터 유효한 썸네일 찾기
+    let thumbnail = "";
+    for (let i = candidates.length - 1; i >= 0; i--) {
+      const img = candidates[i];
+
+      if (
+        img.includes("logo") ||
+        img.includes("favicon") ||
+        img.includes("symbol")
+      ) {
+        continue;
+      }
+
+      thumbnail = img;
+      break;
+    }
+
+    // fallback
+    if (!thumbnail && candidates.length > 0) {
+      thumbnail = candidates[candidates.length - 1];
+    }
+
+    // 상대경로 → 절대경로
+    if (thumbnail && thumbnail.startsWith("/")) {
+      thumbnail = new URL(thumbnail, originalUrl).href;
+    }
 
     return {
       originalUrl,
       thumbnail,
     };
   } catch (error) {
-    console.error("데이터 추출 중 에러 발생:", error);
+    // axios 에러인 경우 간단한 정보만 출력
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const url = error.config?.url || googleUrl;
+      console.error(
+        `뉴스 데이터 추출 실패: ${url} (${status || error.message})`
+      );
+    } else {
+      console.error(
+        "데이터 추출 중 에러 발생:",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
     return null;
   }
 };

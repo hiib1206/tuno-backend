@@ -28,3 +28,15 @@ export const streamNewsJobParamsSchema = z.object({
 export type StreamNewsJobParamsSchema = z.infer<
   typeof streamNewsJobParamsSchema
 >;
+
+// 검색 뉴스 조회 쿼리 스키마 (커서 페이지네이션)
+export const getNewsBySearchSchema = z.object({
+  q: z
+    .string()
+    .trim()
+    .min(1, "검색어는 필수입니다.")
+    .max(200, "검색어는 200자 이하여야 합니다."),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(10).default(10),
+});
+export type GetNewsBySearchSchema = z.infer<typeof getNewsBySearchSchema>;

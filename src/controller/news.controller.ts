@@ -3,6 +3,7 @@ import { NextFunction, Request, Response } from "express";
 import redis from "../config/redis";
 import {
   CreateNewsJobSchema,
+  GetNewsBySearchSchema,
   GetNewsByTopicParamsSchema,
   GetNewsListSchema,
   StreamNewsJobParamsSchema,
@@ -10,6 +11,7 @@ import {
 import { sendSuccess } from "../utils/commonResponse";
 import {
   createHomeRssUrl,
+  createSearchRssUrl,
   createTopicRssUrl,
   fetchGoogleNews,
   getNewsWithThumbnail,
@@ -75,6 +77,30 @@ export const getNewsByTopic = async (
   }
 };
 
+// 검색 뉴스 조회 (커서 페이지네이션 적용)
+export const getNewsBySearch = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    // 검증된 쿼리 파라미터 사용
+    const { q, cursor, limit } = req.validated?.query as GetNewsBySearchSchema;
+
+    const url = createSearchRssUrl(q);
+
+    // 페이지네이션 처리된 데이터 가져오기
+    const { items, meta } = await fetchGoogleNews(url, cursor, limit);
+
+    return sendSuccess(res, 200, "검색 결과를 조회했습니다.", {
+      news: items,
+      ...meta, // { nextCursor, hasNextPage }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // 뉴스 이미지 추출 작업 예약
 export const createNewsJob = async (
   req: Request,
@@ -109,7 +135,6 @@ export const streamNewsJob = async (
   try {
     const { jobId } = req.validated?.params as StreamNewsJobParamsSchema;
     const jobKey = `${JOB_KEY_PREFIX}${jobId}`;
-
     // Redis에서 URL 리스트 가져오기
     const urls = await redis.lrange(jobKey, 0, -1);
 
@@ -153,37 +178,42 @@ export const streamNewsJob = async (
           thumbnail: string;
         };
 
-        if (cached && cached.originalUrl) {
+        if (cached && (cached as any).originalUrl) {
           // 캐시 히트
           result = {
             rssUrl,
-            originalUrl: cached.originalUrl,
-            thumbnail: cached.thumbnail,
+            originalUrl: (cached as any).originalUrl,
+            thumbnail: (cached as any).thumbnail,
           };
         } else {
           // 캐시 미스 - 파싱 수행
           const parsed = await getNewsWithThumbnail(rssUrl);
 
-          if (parsed) {
-            // 결과를 Redis에 캐싱
-            await redis.hset(imageKey, {
-              originalUrl: parsed.originalUrl,
-              thumbnail: parsed.thumbnail,
-            });
-            await redis.expire(imageKey, IMAGE_TTL);
-
-            result = {
-              rssUrl,
-              originalUrl: parsed.originalUrl,
-              thumbnail: parsed.thumbnail,
-            };
-          } else {
-            result = {
-              rssUrl,
-              originalUrl: "",
-              thumbnail: "",
-            };
+          // 파싱 실패 또는 썸네일이 빈 문자열인 경우 에러로 처리
+          if (!parsed || parsed.thumbnail === "") {
+            if (isClientConnected) {
+              res.write(
+                `event: error\ndata: ${JSON.stringify({
+                  rssUrl,
+                  message: "파싱 실패",
+                })}\n\n`
+              );
+            }
+            return; // finally 블록은 여전히 실행됨 (completedCount++ 됨)
           }
+
+          // 결과를 Redis에 캐싱
+          await redis.hset(imageKey, {
+            originalUrl: parsed.originalUrl,
+            thumbnail: parsed.thumbnail,
+          });
+          await redis.expire(imageKey, IMAGE_TTL);
+
+          result = {
+            rssUrl,
+            originalUrl: parsed.originalUrl,
+            thumbnail: parsed.thumbnail,
+          };
         }
 
         // 즉시 SSE로 결과 전송 (event: success)
