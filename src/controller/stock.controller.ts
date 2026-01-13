@@ -76,6 +76,7 @@ export const getStockMaster = async (
           mksc_shrn_iscd: stockCode,
           market_code: exchange, // KP, KQ
           scrt_grp_cls_code: { in: ["ST", "DR", "FS"] },
+          deleted_at: null,
         },
       });
 
@@ -97,6 +98,7 @@ export const getStockMaster = async (
           symb: stockCode,
           excd: exchange, // NAS, NYS, AMS
           stis: "2",
+          deleted_at: null,
         },
       });
 
@@ -325,6 +327,7 @@ export const searchStocks = async (
             { mksc_shrn_iscd: { startsWith: q } }, // 종목코드로 시작
           ],
           scrt_grp_cls_code: { in: ["ST", "DR", "FS"] }, // 주식만
+          deleted_at: null,
         },
         take: limit,
         orderBy: { hts_kor_isnm: "asc" },

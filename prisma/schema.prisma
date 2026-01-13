@@ -176,6 +176,7 @@ model krx_stock_master {
   bstp_smal_div_code String?   @db.Char(4)   /// 업종 소분류
   stck_lstn_date     String?   @db.Char(8)   /// 주식 상장 일자
   nxt_in_master      Boolean   @default(false)      /// 증권사 NXT 종목 마스터 파일 포함 여부 (가공)
+  deleted_at         DateTime? /// 원본에서 삭제된 시각 (배치 기준)
   /// ===== 메타 =====
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
@@ -207,6 +208,7 @@ model foreign_stock_master {
   // 메타
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
+  deleted_at         DateTime? /// 원본에서 삭제된 시각 (배치 기준)
 
   // 키
   @@id([ncod, exid, symb])
