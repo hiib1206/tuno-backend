@@ -1,5 +1,5 @@
 {
-  "name": "ai-traider-express",
+  "name": "tuno-backend",
   "version": "1.0.0",
   "description": "",
   "type": "module",
@@ -24,6 +24,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "firebase-admin": "^13.6.0",
+    "google_news_link_decode": "^1.0.4",
     "google-news-decoder": "^1.0.1",
     "helmet": "^8.1.0",
     "ioredis": "^5.8.2",

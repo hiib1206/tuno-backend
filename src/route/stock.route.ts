@@ -36,7 +36,7 @@ stockRouter.get(
   searchStocks
 );
 
-// GET /api/stocks/005930/quote?market_division_code=UN
+// GET /api/stock/005930/quote?market_division_code=UN&period_type=D
 stockRouter.get(
   "/:code/quote",
   validateMiddleware({

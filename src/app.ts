@@ -9,6 +9,7 @@ import authRouter from "./route/auth.route";
 import newsRouter from "./route/news.route";
 import postCommentRouter from "./route/post-comment.route";
 import postRouter from "./route/post.route";
+import stockRouter from "./route/stock.route";
 import testRouter from "./route/test.route";
 import userRouter from "./route/user.route";
 const app = express();
@@ -41,6 +42,7 @@ app.use("/api/user", userRouter);
 app.use("/api/post", postRouter);
 app.use("/api/comment", postCommentRouter);
 app.use("/api/news", newsRouter);
+app.use("/api/stock", stockRouter);
 
 // Error Handling
 app.use(errorHandler);
