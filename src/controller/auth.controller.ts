@@ -36,8 +36,7 @@ export function sanitizeRedirect(rawRedirect?: string): string {
 
   try {
     const decoded = decodeURIComponent(rawRedirect);
-    const normalized = decoded.split(/[?#]/)[0]; // 쿼리·해시 제거
-    const trimmed = normalized.trim();
+    const trimmed = decoded.trim();
 
     // 내부 경로(`/`로 시작)만 허용
     if (!trimmed.startsWith("/")) return "";
@@ -54,16 +53,8 @@ export function sanitizeRedirect(rawRedirect?: string): string {
     // 제어문자 방지
     if (/[\x00-\x1F\x7F]/.test(trimmed)) return "";
 
-    // ✅ 허용된 경로 prefix 목록
-    const ALLOWED_PREFIXES = ["/analysis", "/community"];
-
-    // 접두사(prefix) 기반 허용
-    const isAllowed = ALLOWED_PREFIXES.some((prefix) =>
-      trimmed.startsWith(prefix)
-    );
-
     // 반환 값 : %2Fmypage 등 인코딩된 값
-    return isAllowed ? encodeURIComponent(decoded) : "";
+    return encodeURIComponent(decoded);
   } catch {
     return "";
   }
