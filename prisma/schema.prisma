@@ -35,6 +35,7 @@ model user {
   posts                    post[]
   post_comments            post_comment[]
   post_likes               post_like[]
+  stock_watch_list         stock_watch_list[]
 
   @@index([is_active], map: "User_is_active_idx")
 }
@@ -254,7 +255,7 @@ model stock_domestic_daily {
   stck_lwpr String? @db.VarChar(10)                           // 주식 최저가
 
   acml_vol String? @db.VarChar(18)                            // 누적 거래량
-  acml_tr_pbmn String? @db.VarChar(18)                        // 누적 거래 대금
+  acml_tr_pbmn String? @db.VarChar(18)                        // 누적 거래 대금(원 단위)
 
   flng_cls_code String? @db.Char(2)                           // 락 구분 코드 (권리락/배당락 등)
   prtt_rate String? @db.VarChar(11)                           // 분할 비율 (기준가/전일 종가)
@@ -390,10 +391,24 @@ model domestic_bstp_period {
   bstp_nmix_hgpr   String? @db.VarChar(112) // 최고가
   bstp_nmix_lwpr   String? @db.VarChar(112) // 최저가
   acml_vol         String? @db.VarChar(18)  // 누적 거래량
-  acml_tr_pbmn     String? @db.VarChar(18)  // 누적 거래 대금
+  acml_tr_pbmn     String? @db.VarChar(18)  // 누적 거래 대금(백만단위)
   mod_yn           String? @db.Char(1)      // 변경 여부
   created_at       DateTime @default(now())
 
   @@unique([bstp_cls_code, period_div_code, stck_bsop_date])
   @@index([stck_bsop_date])
+}
+
+model stock_watch_list {
+  user_id    Int
+  exchange   String   @db.VarChar(10)
+  code       String   @db.VarChar(16)
+
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+
+  user user @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, exchange, code])
+  @@index([user_id, sort_order])
 }
