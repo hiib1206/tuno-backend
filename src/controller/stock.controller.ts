@@ -7,7 +7,10 @@ import {
   GetDomesticStockQuoteSchema,
   GetStockCandleSchema,
   GetStockMasterSchema,
+  GetWatchlistSchema,
   SearchStockSchema,
+  ToggleWatchlistSchema,
+  UpdateWatchlistOrderSchema,
 } from "../schema/stock.schema";
 import { StockCandleItem, StockInfo, StockSearchResult } from "../types/stock";
 import { sendError, sendSuccess } from "../utils/commonResponse";
@@ -16,6 +19,15 @@ import {
   yyyymmddToUnixTimestamp,
 } from "../utils/date";
 import { toDomesticStockQuote } from "../utils/stock";
+import { UserPayload } from "../utils/token";
+
+// 관심종목 한계 초과 에러
+class WatchlistLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WatchlistLimitError";
+  }
+}
 
 // 국내 주식 재무 요약 조회
 export const getDomesticFinancialSummary = async (
@@ -66,6 +78,7 @@ export const getStockMaster = async (
   try {
     const stockCode = req.validated?.params?.code as string;
     const { market, exchange } = req.validated?.query as GetStockMasterSchema;
+    const currentUserId = (req.user as UserPayload)?.userId ?? undefined;
 
     let stockInfo: StockInfo | null = null;
 
@@ -119,7 +132,26 @@ export const getStockMaster = async (
       return sendError(res, 404, "종목 정보를 찾을 수 없습니다.");
     }
 
-    return sendSuccess(res, 200, "종목 정보를 조회했습니다.", stockInfo);
+    // 관심종목 여부 확인 (로그인한 경우에만)
+    let isInWatchlist: boolean | undefined = undefined;
+    if (currentUserId !== undefined) {
+      const watchlist = await prisma.stock_watch_list.findUnique({
+        where: {
+          user_id_exchange_code: {
+            user_id: currentUserId,
+            exchange: stockInfo.exchange,
+            code: stockInfo.code,
+          },
+        },
+      });
+      isInWatchlist = !!watchlist;
+    }
+    console.log("isInWatchlist", isInWatchlist);
+
+    return sendSuccess(res, 200, "종목 정보를 조회했습니다.", {
+      ...stockInfo,
+      isInWatchlist,
+    } as StockInfo);
   } catch (error) {
     next(error);
   }
@@ -388,6 +420,357 @@ export const searchStocks = async (
       query: q,
       count: results.length,
       results,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 관심종목 추가/제거 (토글)
+export const toggleWatchlist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.user as UserPayload;
+    const stockCode = req.validated?.params?.code as string;
+    const { exchange } = req.validated?.query as ToggleWatchlistSchema;
+
+    // exchange로 market 판단
+    const isDomestic = exchange === "KP" || exchange === "KQ";
+
+    // 종목 존재 여부 및 삭제 여부 확인
+    let stockExists = false;
+    if (isDomestic) {
+      // 국내 주식 마스터 확인
+      const stockMaster = await prisma.krx_stock_master.findFirst({
+        where: {
+          mksc_shrn_iscd: stockCode,
+          market_code: exchange,
+          scrt_grp_cls_code: { in: ["ST", "DR", "FS"] },
+          deleted_at: null,
+        },
+      });
+      stockExists = !!stockMaster;
+    } else {
+      // 해외 주식 마스터 확인
+      const stockMaster = await prisma.foreign_stock_master.findFirst({
+        where: {
+          symb: stockCode,
+          excd: exchange,
+          stis: "2",
+          deleted_at: null,
+        },
+      });
+      stockExists = !!stockMaster;
+    }
+
+    if (!stockExists) {
+      return sendError(res, 404, "종목을 찾을 수 없습니다.");
+    }
+
+    // 트랜잭션으로 관심종목 추가/제거
+    const result = await prisma.$transaction(async (tx) => {
+      // 트랜잭션 안에서 현재 사용자의 관심종목 존재 여부 확인
+      const existingWatchlist = await tx.stock_watch_list.findUnique({
+        where: {
+          user_id_exchange_code: {
+            user_id: userId,
+            exchange: exchange,
+            code: stockCode,
+          },
+        },
+      });
+
+      if (existingWatchlist) {
+        // 관심종목 제거
+        await tx.stock_watch_list.delete({
+          where: {
+            user_id_exchange_code: {
+              user_id: userId,
+              exchange: exchange,
+              code: stockCode,
+            },
+          },
+        });
+
+        return {
+          isInWatchlist: false,
+        };
+      } else {
+        // 관심종목 추가 전에 100개 한계 체크
+        const currentCount = await tx.stock_watch_list.count({
+          where: {
+            user_id: userId,
+          },
+        });
+
+        if (currentCount >= 100) {
+          throw new WatchlistLimitError(
+            "관심종목은 최대 100개까지 추가할 수 있습니다."
+          );
+        }
+
+        // 관심종목 추가
+        await tx.stock_watch_list.create({
+          data: {
+            user_id: userId,
+            exchange: exchange,
+            code: stockCode,
+          },
+        });
+
+        return {
+          isInWatchlist: true,
+        };
+      }
+    });
+
+    return sendSuccess(
+      res,
+      200,
+      result.isInWatchlist
+        ? "관심종목에 추가되었습니다."
+        : "관심종목에서 제거되었습니다.",
+      result
+    );
+  } catch (error) {
+    // 100개 한계 초과 에러 처리
+    if (error instanceof WatchlistLimitError) {
+      return sendError(res, 400, error.message);
+    }
+    next(error);
+  }
+};
+
+// 관심종목 목록 조회
+export const getWatchlist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.user as UserPayload;
+    const { exchange } = req.validated?.query as GetWatchlistSchema;
+
+    // 1. 관심종목 목록 조회
+    const watchlistItems = await prisma.stock_watch_list.findMany({
+      where: {
+        user_id: userId,
+        ...(exchange && { exchange }),
+      },
+      orderBy: {
+        sort_order: "asc",
+      },
+    });
+
+    if (watchlistItems.length === 0) {
+      return sendSuccess(res, 200, "관심종목 목록을 조회했습니다.", {
+        count: 0,
+        items: [],
+      });
+    }
+
+    // 2. exchange별로 그룹화
+    const domesticGroups: Record<string, string[]> = {}; // { "KP": ["005930", ...], "KQ": [...] }
+    const foreignGroups: Record<string, string[]> = {}; // { "NAS": ["AAPL", ...], ... }
+    const watchlistMap = new Map<string, (typeof watchlistItems)[0]>(); // code+exchange -> watchlist item
+
+    for (const item of watchlistItems) {
+      const key = `${item.exchange}:${item.code}`;
+      watchlistMap.set(key, item);
+
+      if (item.exchange === "KP" || item.exchange === "KQ") {
+        if (!domesticGroups[item.exchange]) {
+          domesticGroups[item.exchange] = [];
+        }
+        domesticGroups[item.exchange].push(item.code);
+      } else {
+        if (!foreignGroups[item.exchange]) {
+          foreignGroups[item.exchange] = [];
+        }
+        foreignGroups[item.exchange].push(item.code);
+      }
+    }
+
+    // 3. 배치로 마스터 정보 조회
+    const stockMasterMap = new Map<string, any>(); // code+exchange -> stock master
+
+    // 국내 주식 배치 조회
+    for (const [exch, codes] of Object.entries(domesticGroups)) {
+      if (codes.length > 0) {
+        const masters = await prisma.krx_stock_master.findMany({
+          where: {
+            mksc_shrn_iscd: { in: codes },
+            market_code: exch,
+            scrt_grp_cls_code: { in: ["ST", "DR", "FS"] },
+            deleted_at: null,
+          },
+        });
+
+        for (const master of masters) {
+          const key = `${exch}:${master.mksc_shrn_iscd.trim()}`;
+          stockMasterMap.set(key, master);
+        }
+      }
+    }
+
+    // 해외 주식 배치 조회
+    for (const [exch, codes] of Object.entries(foreignGroups)) {
+      if (codes.length > 0) {
+        const masters = await prisma.foreign_stock_master.findMany({
+          where: {
+            symb: { in: codes },
+            excd: exch,
+            stis: "2",
+            deleted_at: null,
+          },
+        });
+
+        for (const master of masters) {
+          const key = `${exch}:${master.symb.trim()}`;
+          stockMasterMap.set(key, master);
+        }
+      }
+    }
+
+    // 4. 결과 조합
+    const stockInfos: StockInfo[] = [];
+
+    for (const item of watchlistItems) {
+      const key = `${item.exchange}:${item.code}`;
+      const stockMaster = stockMasterMap.get(key);
+
+      if (!stockMaster) {
+        // 삭제된 종목은 제외
+        continue;
+      }
+
+      const isDomestic = item.exchange === "KP" || item.exchange === "KQ";
+      let stockInfo: StockInfo;
+
+      if (isDomestic) {
+        stockInfo = {
+          market: "KR",
+          exchange: item.exchange as "KP" | "KQ",
+          code: stockMaster.mksc_shrn_iscd.trim(),
+          nameKo: stockMaster.hts_kor_isnm,
+          nameEn: null,
+          listedAt: stockMaster.stck_lstn_date?.trim() || null,
+          isNxtInMaster: stockMaster.nxt_in_master,
+        };
+      } else {
+        stockInfo = {
+          market: "US",
+          exchange: item.exchange as "NAS" | "NYS" | "AMS",
+          code: stockMaster.symb.trim(),
+          nameKo: stockMaster.knam,
+          nameEn: stockMaster.enam,
+          listedAt: null,
+          isNxtInMaster: null,
+        };
+      }
+
+      stockInfos.push(stockInfo);
+    }
+
+    return sendSuccess(res, 200, "관심종목 목록을 조회했습니다.", {
+      count: stockInfos.length,
+      items: stockInfos,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 관심종목 전체 삭제
+export const deleteAllWatchlist = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.user as UserPayload;
+
+    const result = await prisma.stock_watch_list.deleteMany({
+      where: {
+        user_id: userId,
+      },
+    });
+
+    return sendSuccess(res, 200, "관심종목이 전체 삭제되었습니다.", {
+      deletedCount: result.count,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 관심종목 순서 변경
+export const updateWatchlistOrder = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.user as UserPayload;
+    const { order } = req.validated?.body as UpdateWatchlistOrderSchema;
+
+    // 1. 사용자의 관심종목인지 검증
+    const watchlistItems = await prisma.stock_watch_list.findMany({
+      where: {
+        user_id: userId,
+      },
+      select: {
+        exchange: true,
+        code: true,
+      },
+    });
+
+    // 관심종목을 Map으로 변환 (빠른 검색)
+    const watchlistMap = new Map<string, boolean>();
+    for (const item of watchlistItems) {
+      const key = `${item.exchange}:${item.code}`;
+      watchlistMap.set(key, true);
+    }
+
+    // 요청된 항목들이 모두 사용자의 관심종목인지 확인
+    const invalidItems: Array<{ exchange: string; code: string }> = [];
+    for (const item of order) {
+      const key = `${item.exchange}:${item.code}`;
+      if (!watchlistMap.has(key)) {
+        invalidItems.push(item);
+      }
+    }
+
+    if (invalidItems.length > 0) {
+      return sendError(res, 400, "관심종목에 없는 종목이 포함되어 있습니다.", {
+        invalidItems,
+      });
+    }
+
+    // 2. 순서대로 sort_order 재정렬 (1, 2, 3...)
+    await prisma.$transaction(async (tx) => {
+      for (let i = 0; i < order.length; i++) {
+        const item = order[i];
+        await tx.stock_watch_list.update({
+          where: {
+            user_id_exchange_code: {
+              user_id: userId,
+              exchange: item.exchange,
+              code: item.code,
+            },
+          },
+          data: {
+            sort_order: i + 1,
+          },
+        });
+      }
+    });
+
+    return sendSuccess(res, 200, "관심종목 순서가 변경되었습니다.", {
+      count: order.length,
     });
   } catch (error) {
     next(error);

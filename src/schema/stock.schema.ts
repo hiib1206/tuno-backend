@@ -151,3 +151,46 @@ export const searchStockSchema = z.object({
 });
 
 export type SearchStockSchema = z.infer<typeof searchStockSchema>;
+
+// 관심종목 토글 쿼리 파라미터 검증
+export const toggleWatchlistSchema = z.object({
+  exchange: z.enum(["KP", "KQ", "NAS", "NYS", "AMS"], {
+    message:
+      "거래소 코드가 올바르지 않습니다. (KP, KQ, NAS, NYS, AMS 중 하나여야 합니다.)",
+  }),
+});
+export type ToggleWatchlistSchema = z.infer<typeof toggleWatchlistSchema>;
+
+// 관심종목 목록 조회 쿼리 파라미터 검증
+export const getWatchlistSchema = z.object({
+  exchange: z
+    .enum(["KP", "KQ", "NAS", "NYS", "AMS"], {
+      message:
+        "거래소 코드가 올바르지 않습니다. (KP, KQ, NAS, NYS, AMS 중 하나여야 합니다.)",
+    })
+    .optional(),
+});
+export type GetWatchlistSchema = z.infer<typeof getWatchlistSchema>;
+
+// 관심종목 순서 변경 body 검증
+export const updateWatchlistOrderSchema = z.object({
+  order: z
+    .array(
+      z.object({
+        exchange: z.enum(["KP", "KQ", "NAS", "NYS", "AMS"], {
+          message:
+            "거래소 코드가 올바르지 않습니다. (KP, KQ, NAS, NYS, AMS 중 하나여야 합니다.)",
+        }),
+        code: z
+          .string()
+          .min(1, "종목코드를 입력해주세요.")
+          .max(16, "종목코드는 최대 16자리입니다.")
+          .regex(/^[A-Z0-9]+$/, "종목코드는 영문자와 숫자만 가능합니다."),
+      })
+    )
+    .min(1, "순서 배열은 최소 1개 이상이어야 합니다.")
+    .max(100, "순서 배열은 최대 100개까지 가능합니다."),
+});
+export type UpdateWatchlistOrderSchema = z.infer<
+  typeof updateWatchlistOrderSchema
+>;

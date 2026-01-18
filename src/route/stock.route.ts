@@ -1,11 +1,19 @@
 import { Router } from "express";
 import {
+  deleteAllWatchlist,
   getDomesticFinancialSummary,
   getStockCandle,
   getStockMaster,
   getStockQuote,
+  getWatchlist,
   searchStocks,
+  toggleWatchlist,
+  updateWatchlistOrder,
 } from "../controller/stock.controller";
+import {
+  optionalVerifyAccessTokenMiddleware,
+  verifyAccessTokenMiddleware,
+} from "../middleware/auth.middleware";
 import { validateMiddleware } from "../middleware/validation.middleware";
 import {
   getDomesticFinancialSummarySchema,
@@ -13,7 +21,10 @@ import {
   getStockCandleSchema,
   getStockCodeSchema,
   getStockMasterSchema,
+  getWatchlistSchema,
   searchStockSchema,
+  toggleWatchlistSchema,
+  updateWatchlistOrderSchema,
 } from "../schema/stock.schema";
 
 const stockRouter = Router();
@@ -34,6 +45,33 @@ stockRouter.get(
     query: searchStockSchema,
   }),
   searchStocks
+);
+
+// GET /api/stock/watchlist?exchange=KP
+stockRouter.get(
+  "/watchlist",
+  verifyAccessTokenMiddleware,
+  validateMiddleware({
+    query: getWatchlistSchema,
+  }),
+  getWatchlist
+);
+
+// PATCH /api/stock/watchlist/order
+stockRouter.patch(
+  "/watchlist/order",
+  verifyAccessTokenMiddleware,
+  validateMiddleware({
+    body: updateWatchlistOrderSchema,
+  }),
+  updateWatchlistOrder
+);
+
+// DELETE /api/stock/watchlist - 전체 관심종목 삭제
+stockRouter.delete(
+  "/watchlist",
+  verifyAccessTokenMiddleware,
+  deleteAllWatchlist
 );
 
 // GET /api/stock/005930/quote?market_division_code=UN&period_type=D
@@ -59,11 +97,23 @@ stockRouter.get(
 // GET /api/stock/:code?market=KR&exchange=KP
 stockRouter.get(
   "/:code",
+  optionalVerifyAccessTokenMiddleware,
   validateMiddleware({
     params: getStockCodeSchema,
     query: getStockMasterSchema,
   }),
   getStockMaster
+);
+
+// POST /api/stock/:code/watchlist?exchange=KP
+stockRouter.post(
+  "/:code/watchlist",
+  verifyAccessTokenMiddleware,
+  validateMiddleware({
+    params: getStockCodeSchema,
+    query: toggleWatchlistSchema,
+  }),
+  toggleWatchlist
 );
 
 export default stockRouter;

@@ -16,6 +16,7 @@ export type StockInfo = {
   nameEn: string | null; // 영문 종목명
   listedAt: string | null; // 상장일자 (YYYYMMDD)
   isNxtInMaster: boolean | null; // 증권사 NXT 종목 마스터 파일 포함 여부
+  isInWatchlist?: boolean; // 관심종목 여부 (로그인한 경우에만 포함)
 };
 
 export type DomesticStockQuote = {
