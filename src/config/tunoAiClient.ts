@@ -18,16 +18,18 @@ export const handleTunoAiAxiosError = (
   if (!axios.isAxiosError(error)) return false;
 
   if (error.response) {
-    sendError(res, error.response.status, "tuno-ai 서버 오류");
+    const { status, data } = error.response;
+    const message = data?.detail || "tuno-ai 서버 오류";
+    sendError(res, status, message);
     return true;
   }
 
   if (error.code === "ECONNABORTED") {
-    sendError(res, 504, "tuno-ai 서버 오류");
+    sendError(res, 504, "tuno-ai 서버 타임아웃");
     return true;
   }
 
-  sendError(res, 502, "tuno-ai 서버 오류");
+  sendError(res, 502, "tuno-ai 서버 연결 실패");
   return true;
 };
 
