@@ -6,6 +6,7 @@ import { optionalDeviceIdMiddleware } from "./middleware/deviceId.middleware";
 import { errorHandler } from "./middleware/error.middleware";
 import morganMiddleware from "./middleware/morgan.middleware";
 import authRouter from "./route/auth.route";
+import inferenceRouter from "./route/inference.route";
 import newsRouter from "./route/news.route";
 import notificationRouter from "./route/notification.route";
 import postCommentRouter from "./route/post-comment.route";
@@ -44,6 +45,7 @@ app.use("/api/post", postRouter);
 app.use("/api/comment", postCommentRouter);
 app.use("/api/news", newsRouter);
 app.use("/api/stock", stockRouter);
+app.use("/api/inference", inferenceRouter);
 app.use("/api/notification", notificationRouter);
 
 // Error Handling
