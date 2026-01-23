@@ -9,6 +9,7 @@ import {
 } from "../schema/post-comment.schema";
 import { sendToUser } from "../service/sse.service";
 import { sendError, sendSuccess } from "../utils/commonResponse";
+import { CommentNotificationData, ReplyNotificationData } from "../types/notification";
 import { notification_type, SSEEvent } from "../utils/notification";
 import { toPostCommentResponse } from "../utils/post-comment";
 import { UserPayload } from "../utils/token";
@@ -119,17 +120,19 @@ export const createPostComment = async (
       if (parentComment) {
         // 대댓글인 경우: 부모 댓글 작성자에게 알림 (본인 제외)
         if (parentComment.author_id !== userId) {
+          const notificationData: ReplyNotificationData = {
+            postId: postId.toString(),
+            commentId: parentComment.id.toString(),
+            replyId: comment.id.toString(),
+            preview: content.slice(0, 50),
+          };
+
           const notification = await prisma.notification.create({
             data: {
               user_id: parentComment.author_id,
               actor_id: userId,
               type: notification_type.REPLY,
-              data: {
-                postId: postId.toString(),
-                commentId: parentComment.id.toString(),
-                replyId: comment.id.toString(),
-                preview: content.slice(0, 50),
-              },
+              data: notificationData,
             },
           });
 
@@ -141,16 +144,18 @@ export const createPostComment = async (
       } else {
         // 일반 댓글인 경우: 글 작성자에게 알림 (본인 제외)
         if (post.author_id !== userId) {
+          const notificationData: CommentNotificationData = {
+            postId: postId.toString(),
+            commentId: comment.id.toString(),
+            preview: content.slice(0, 50),
+          };
+
           const notification = await prisma.notification.create({
             data: {
               user_id: post.author_id,
               actor_id: userId,
               type: notification_type.COMMENT,
-              data: {
-                postId: postId.toString(),
-                commentId: comment.id.toString(),
-                preview: content.slice(0, 50),
-              },
+              data: notificationData,
             },
           });
 
