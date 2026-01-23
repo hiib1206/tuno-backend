@@ -1,0 +1,33 @@
+import axios from "axios";
+import type { Response } from "express";
+import { sendError } from "../utils/commonResponse";
+import { env } from "./env";
+
+export const tunoAiClient = axios.create({
+  baseURL: env.TUNO_AI_API_BASE_URL,
+  timeout: 5000,
+  headers: {
+    "x-internal-secret-key": env.TUNO_AI_API_SECRET_KEY,
+  },
+});
+
+export const handleTunoAiAxiosError = (
+  res: Response,
+  error: unknown
+): boolean => {
+  if (!axios.isAxiosError(error)) return false;
+
+  if (error.response) {
+    sendError(res, error.response.status, "tuno-ai 서버 오류");
+    return true;
+  }
+
+  if (error.code === "ECONNABORTED") {
+    sendError(res, 504, "tuno-ai 서버 오류");
+    return true;
+  }
+
+  sendError(res, 502, "tuno-ai 서버 오류");
+  return true;
+};
+

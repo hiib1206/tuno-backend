@@ -1,6 +1,5 @@
-import axios from "axios";
 import { NextFunction, Request, Response } from "express";
-import { env } from "../config/env";
+import { handleTunoAiAxiosError, tunoAiClient } from "../config/tunoAiClient";
 import prisma from "../config/prisma";
 import {
   GetDomesticFinancialSummarySchema,
@@ -302,39 +301,18 @@ export const getStockQuote = async (
     const { market_division_code, period_type } = req.validated
       ?.query as GetDomesticStockQuoteSchema;
     // tuno-ai 서버로 요청
-    const response = await axios.get(
-      `${env.TUNO_AI_API_BASE_URL}/api/v1/domestic-stocks/${stockCode}/quote`,
+    const response = await tunoAiClient.get(
+      `/api/v1/domestic-stocks/${stockCode}/quote`,
       {
         params: { market_division_code, period_type },
         timeout: 5000, // 5초 타임아웃
-        headers: {
-          "x-internal-secret-key": env.TUNO_AI_API_SECRET_KEY,
-        },
       }
     );
     const data = toDomesticStockQuote(response.data.output);
 
     return sendSuccess(res, 200, "주식 현재가 시세를 조회했습니다.", data);
   } catch (error) {
-    // Axios 에러 처리
-    if (axios.isAxiosError(error)) {
-      if (error.response) {
-        // FastAPI에서 온 에러 응답 (400, 422, 502 등)
-        return sendError(
-          res,
-          error.response.status,
-          error.response.data?.message || "tuno-ai 서버 오류"
-        );
-      } else if (error.code === "ECONNABORTED") {
-        // 타임아웃
-        return sendError(res, 504, "tuno-ai 서버 응답 시간 초과");
-      } else {
-        // 네트워크 에러 (연결 실패)
-        return sendError(res, 502, "tuno-ai 서버 연결 실패");
-      }
-    }
-
-    // 기타 에러
+    if (handleTunoAiAxiosError(res, error)) return;
     next(error);
   }
 };
