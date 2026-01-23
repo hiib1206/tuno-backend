@@ -50,8 +50,8 @@ export const getPostListService = async (
   let totalCount: number;
 
   if (search) {
-    // fulltext 검색 사용
-    const searchTerm = `${search.trim()}*`;
+    // LIKE 검색 사용 (한글 부분 검색 지원)
+    const searchTerm = `%${search.trim()}%`;
     const categoryCondition = category
       ? Prisma.sql`AND p.category = ${category}`
       : Prisma.sql``;
@@ -64,7 +64,6 @@ export const getPostListService = async (
     const searchQuery = Prisma.sql`
       SELECT
         p.*,
-        MATCH(p.title, p.content) AGAINST(${searchTerm} IN BOOLEAN MODE) as relevance,
         JSON_OBJECT(
           'id', u.id,
           'username', u.username,
@@ -85,10 +84,10 @@ export const getPostListService = async (
       WHERE p.deleted_at IS NULL
         ${authorCondition}
         ${categoryCondition}
-        AND MATCH(p.title, p.content) AGAINST(${searchTerm} IN BOOLEAN MODE)
-      ORDER BY p.is_pinned DESC, relevance DESC, p.${Prisma.raw(
-        sortField
-      )} ${Prisma.raw(sortOrder)}, p.created_at DESC
+        AND (p.title LIKE ${searchTerm} OR p.content LIKE ${searchTerm})
+      ORDER BY p.is_pinned DESC, p.${Prisma.raw(sortField)} ${Prisma.raw(
+        sortOrder
+      )}, p.created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
 
@@ -98,7 +97,7 @@ export const getPostListService = async (
       WHERE p.deleted_at IS NULL
         ${authorCondition}
         ${categoryCondition}
-        AND MATCH(p.title, p.content) AGAINST(${searchTerm} IN BOOLEAN MODE)
+        AND (p.title LIKE ${searchTerm} OR p.content LIKE ${searchTerm})
     `;
 
     const [rawPosts, rawCount] = await Promise.all([

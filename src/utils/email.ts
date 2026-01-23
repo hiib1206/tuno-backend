@@ -143,7 +143,7 @@ export async function sendVerificationEmail(
                 <tr>
                   <td style="padding: 20px 0 0 0; text-align: center;">
                     <p style="margin: 0; color: ${textColorLight}; font-size: 11px;">
-                      © ${new Date().getFullYear()} AI Trader. All rights reserved.
+                      © ${new Date().getFullYear()} Tuno. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -171,7 +171,7 @@ export async function sendVerificationEmail(
 이 이메일은 자동으로 발송되었습니다.
 문의사항이 있으시면 고객센터로 연락해주세요.
 
-© ${new Date().getFullYear()} AI Trader. All rights reserved.
+© ${new Date().getFullYear()} Tuno. All rights reserved.
   `;
 
   const msg = {
@@ -180,7 +180,7 @@ export async function sendVerificationEmail(
       email: env.SENDGRID_FROM_EMAIL, //발신자 이메일
       name: env.SENDGRID_FROM_NAME, //발신자 이름
     },
-    subject: "AI Trader 회원 이메일 인증 요청",
+    subject: "Tuno 회원 이메일 인증 요청",
     text: textContent,
     html: htmlContent,
   };
