@@ -36,6 +36,8 @@ model user {
   post_comments            post_comment[]
   post_likes               post_like[]
   stock_watch_list         stock_watch_list[]
+  received_notifications   notification[] @relation("ReceivedNotifications")
+  actor_notifications      notification[] @relation("ActorNotifications")
 
   @@index([is_active], map: "User_is_active_idx")
 }
@@ -399,6 +401,33 @@ model domestic_bstp_period {
 
   @@unique([bstp_cls_code, period_div_code, stck_bsop_date])
   @@index([stck_bsop_date])
+}
+
+// 알림 타입
+enum notification_type {
+  COMMENT               // 내 글에 댓글
+  REPLY                 // 내 댓글에 대댓글
+  AI_INFERENCE_COMPLETE // AI 추론 완료
+  SYSTEM_NOTICE         // 시스템 공지
+}
+
+// 알림 (notification)
+model notification {
+  id            BigInt            @id @default(autoincrement())
+
+  user_id       Int    // 수신자 (알림 받는 사람)
+  user          user              @relation("ReceivedNotifications", fields: [user_id], references: [id], onDelete: Cascade)
+
+  actor_id      Int?    // 발생시킨 사람 (댓글 단 사람 등, 시스템 알림은 null)
+  actor         user?             @relation("ActorNotifications", fields: [actor_id], references: [id], onDelete: Cascade)
+
+  type          notification_type   // 알림 종류
+  data          Json?   // 추가 데이터 (postId, commentId, inferenceId 등)
+  read_at       DateTime?    // 읽음 여부 (null이면 안읽음, 시간이면 읽음)
+  created_at    DateTime          @default(now())
+
+  @@index([user_id, created_at(sort: Desc)]) //알림함 조회용 (유저별 최신순)
+  @@index([user_id, read_at]) //안읽은 알림 개수 조회용
 }
 
 model stock_watch_list {
