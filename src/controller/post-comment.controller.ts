@@ -7,7 +7,9 @@ import {
   GetPostCommentListSchema,
   UpdatePostCommentSchema,
 } from "../schema/post-comment.schema";
+import { sendToUser } from "../service/sse.service";
 import { sendError, sendSuccess } from "../utils/commonResponse";
+import { notification_type, SSEEvent } from "../utils/notification";
 import { toPostCommentResponse } from "../utils/post-comment";
 import { UserPayload } from "../utils/token";
 
@@ -43,9 +45,11 @@ export const createPostComment = async (
     }
 
     // 대댓글인 경우 부모 댓글 존재 여부 확인
+    let parentComment: { id: bigint; author_id: number; parent_id: bigint | null; post_id: bigint; deleted_at: Date | null } | null = null;
     if (parent_id) {
-      const parentComment = await prisma.post_comment.findUnique({
+      parentComment = await prisma.post_comment.findUnique({
         where: { id: parent_id },
+        select: { id: true, author_id: true, parent_id: true, post_id: true, deleted_at: true },
       });
 
       if (!parentComment) {
@@ -109,6 +113,57 @@ export const createPostComment = async (
 
       return newComment;
     });
+
+    // 알림 생성 (트랜잭션 바깥 - 실패해도 댓글은 저장됨)
+    try {
+      if (parentComment) {
+        // 대댓글인 경우: 부모 댓글 작성자에게 알림 (본인 제외)
+        if (parentComment.author_id !== userId) {
+          const notification = await prisma.notification.create({
+            data: {
+              user_id: parentComment.author_id,
+              actor_id: userId,
+              type: notification_type.REPLY,
+              data: {
+                postId: postId.toString(),
+                commentId: parentComment.id.toString(),
+                replyId: comment.id.toString(),
+                preview: content.slice(0, 50),
+              },
+            },
+          });
+
+          // SSE로 실시간 알림
+          sendToUser(parentComment.author_id.toString(), SSEEvent.NOTIFICATION_CREATED, {
+            notificationId: notification.id.toString(),
+          });
+        }
+      } else {
+        // 일반 댓글인 경우: 글 작성자에게 알림 (본인 제외)
+        if (post.author_id !== userId) {
+          const notification = await prisma.notification.create({
+            data: {
+              user_id: post.author_id,
+              actor_id: userId,
+              type: notification_type.COMMENT,
+              data: {
+                postId: postId.toString(),
+                commentId: comment.id.toString(),
+                preview: content.slice(0, 50),
+              },
+            },
+          });
+
+          // SSE로 실시간 알림
+          sendToUser(post.author_id.toString(), SSEEvent.NOTIFICATION_CREATED, {
+            notificationId: notification.id.toString(),
+          });
+        }
+      }
+    } catch (notificationError) {
+      // 알림 생성 실패해도 댓글은 이미 저장됨 - 로그만 남김
+      console.error("알림 생성 실패:", notificationError);
+    }
 
     return sendSuccess(res, 201, "댓글이 생성되었습니다.", {
       comment: toPostCommentResponse(comment),

@@ -10,7 +10,7 @@ export const toPostCommentResponse = (
   comment: post_commentModel & {
     author?: {
       id: number;
-      username: string;
+      username: string | null;
       nick: string;
       profile_image_url: string | null;
     };
