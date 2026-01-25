@@ -13,6 +13,7 @@ import postCommentRouter from "./route/post-comment.route";
 import postRouter from "./route/post.route";
 import stockRouter from "./route/stock.route";
 import testRouter from "./route/test.route";
+import themeRouter from "./route/theme.route";
 import userRouter from "./route/user.route";
 const app = express();
 
@@ -45,6 +46,7 @@ app.use("/api/post", postRouter);
 app.use("/api/comment", postCommentRouter);
 app.use("/api/news", newsRouter);
 app.use("/api/stock", stockRouter);
+app.use("/api/theme", themeRouter);
 app.use("/api/inference", inferenceRouter);
 app.use("/api/notification", notificationRouter);
 
