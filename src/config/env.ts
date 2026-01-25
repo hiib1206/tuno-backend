@@ -46,6 +46,10 @@ const envSchema = z.object({
   // Kakao OAuth Client
   KAKAO_CLIENT_ID: z.string().min(1),
   KAKAO_CLIENT_SECRET: z.string().min(1),
+
+  // LS증권 API
+  LS_APP_KEY: z.string().min(1),
+  LS_SECRET_KEY: z.string().min(1),
 });
 
 // 환경변수 검증 및 타입 추론
