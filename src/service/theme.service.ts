@@ -1,3 +1,4 @@
+import prisma from "../config/prisma";
 import redis from "../config/redis";
 import {
   getSpecialThemes,
@@ -34,10 +35,10 @@ export const getSpecialThemesService = async (
   const result = await getSpecialThemes({ gubun });
   const themes = result.themes;
 
-  // 앞 15개 + 뒤 15개 추출
+  // 앞 10개 + 뒤 10개 추출
   const data: SpecialThemesResult = {
-    top: themes.slice(0, 15),
-    bottom: themes.slice(-15),
+    top: themes.slice(0, 10),
+    bottom: themes.slice(-10),
   };
 
   // 캐시 저장 (5초)
@@ -47,9 +48,13 @@ export const getSpecialThemesService = async (
 };
 
 // 테마 종목 조회
+export type ThemeStockWithExchange = T1537OutBlock1Item & {
+  exchange: string | null;
+};
+
 export type ThemeStocksResult = {
   info: T1537OutBlock;
-  stocks: T1537OutBlock1Item[];
+  stocks: ThemeStockWithExchange[];
 };
 
 export const getThemeStocksService = async (
@@ -66,8 +71,31 @@ export const getThemeStocksService = async (
   // LS API 호출
   const result = await getThemeStocks(tmcode);
 
-  // 캐시 저장 (5초)
-  await redis.set(cacheKey, JSON.stringify(result), "EX", CACHE_TTL);
+  // 종목코드로 market_code 조회
+  const shcodes = result.stocks.map((s) => s.shcode);
+  const masters = await prisma.krx_stock_master.findMany({
+    where: { mksc_shrn_iscd: { in: shcodes } },
+    select: { mksc_shrn_iscd: true, market_code: true },
+  });
+  const marketMap = new Map(
+    masters.map((m) => [m.mksc_shrn_iscd, m.market_code])
+  );
 
-  return result;
+  // exchange 필드 추가
+  const stocksWithExchange: ThemeStockWithExchange[] = result.stocks.map(
+    (s) => ({
+      ...s,
+      exchange: marketMap.get(s.shcode) ?? null,
+    })
+  );
+
+  const data: ThemeStocksResult = {
+    info: result.info,
+    stocks: stocksWithExchange,
+  };
+
+  // 캐시 저장 (5초)
+  await redis.set(cacheKey, JSON.stringify(data), "EX", CACHE_TTL);
+
+  return data;
 };

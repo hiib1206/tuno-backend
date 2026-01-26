@@ -7,6 +7,7 @@ import { handleLSError } from "../securities/ls";
 import {
   getSpecialThemesService,
   getThemeStocksService,
+  ThemeStocksResult,
 } from "../service/theme.service";
 import { sendSuccess } from "../utils/commonResponse";
 
@@ -35,7 +36,7 @@ export const getThemeStocks = async (
 ) => {
   try {
     const { tmcode } = req.validated?.params as GetThemeStocksParamsSchema;
-    const data = await getThemeStocksService(tmcode);
+    const data: ThemeStocksResult = await getThemeStocksService(tmcode);
 
     return sendSuccess(res, 200, "테마 종목 조회 성공", data);
   } catch (error) {
