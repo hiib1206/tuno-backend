@@ -145,9 +145,7 @@ export const searchStockSchema = z.object({
     .number()
     .int()
     .min(1, "limit은 최소 1이어야 합니다.")
-    .max(50, "limit은 최대 50입니다.")
     .optional()
-    .default(10),
 });
 
 export type SearchStockSchema = z.infer<typeof searchStockSchema>;
