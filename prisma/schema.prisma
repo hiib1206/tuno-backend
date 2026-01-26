@@ -443,3 +443,10 @@ model stock_watch_list {
   @@id([user_id, exchange, code])
   @@index([user_id, sort_order])
 }
+
+model krx_stock_summary {
+  mksc_shrn_iscd String   @id @db.Char(9) /// 종목 단축코드 (PK)
+  summary        String   @db.Text /// 기업개요
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+}

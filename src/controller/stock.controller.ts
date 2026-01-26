@@ -93,6 +93,11 @@ export const getStockMaster = async (
       });
 
       if (stockMaster) {
+        // 기업개요 조회
+        const stockSummary = await prisma.krx_stock_summary.findUnique({
+          where: { mksc_shrn_iscd: stockCode },
+        });
+
         stockInfo = {
           market: "KR",
           exchange: exchange as "KP" | "KQ",
@@ -101,6 +106,7 @@ export const getStockMaster = async (
           nameEn: null, // 국내 주식은 영문명 없음
           listedAt: stockMaster.stck_lstn_date?.trim() || null,
           isNxtInMaster: stockMaster.nxt_in_master,
+          summary: stockSummary?.summary || null,
         };
       }
     } else {
@@ -145,7 +151,6 @@ export const getStockMaster = async (
       });
       isInWatchlist = !!watchlist;
     }
-    console.log("isInWatchlist", isInWatchlist);
 
     return sendSuccess(res, 200, "종목 정보를 조회했습니다.", {
       ...stockInfo,
