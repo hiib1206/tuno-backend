@@ -37,6 +37,6 @@ export const getNewsBySearchSchema = z.object({
     .min(1, "검색어는 필수입니다.")
     .max(200, "검색어는 200자 이하여야 합니다."),
   cursor: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(10).default(10),
+  limit: z.coerce.number().int().min(1).max(30).default(10),
 });
 export type GetNewsBySearchSchema = z.infer<typeof getNewsBySearchSchema>;
