@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   deleteAllWatchlist,
   getDomesticFinancialSummary,
+  getOrderbook,
   getStockCandle,
   getStockMaster,
   getStockQuote,
@@ -18,6 +19,7 @@ import { validateMiddleware } from "../middleware/validation.middleware";
 import {
   getDomesticFinancialSummarySchema,
   getDomesticStockQuoteSchema,
+  getOrderbookSchema,
   getStockCandleSchema,
   getStockCodeSchema,
   getStockMasterSchema,
@@ -82,6 +84,16 @@ stockRouter.get(
     query: getDomesticStockQuoteSchema,
   }),
   getStockQuote
+);
+
+// GET /api/stock/005930/orderbook?market_division_code=J
+stockRouter.get(
+  "/:code/orderbook",
+  validateMiddleware({
+    params: getStockCodeSchema,
+    query: getOrderbookSchema,
+  }),
+  getOrderbook
 );
 
 // GET /api/stock/:code/financials?period=y&limit=4&order=desc

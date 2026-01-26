@@ -129,6 +129,17 @@ export type GetDomesticStockQuoteSchema = z.infer<
   typeof getDomesticStockQuoteSchema
 >;
 
+// 국내 주식 호가 조회 쿼리 파라미터 검증
+export const getOrderbookSchema = z.object({
+  market_division_code: z
+    .enum(["J", "NX", "UN"], {
+      message:
+        "시장 구분은 'J'(KRX), 'NX'(NXT), 'UN'(통합) 중 하나여야 합니다.",
+    })
+});
+
+export type GetOrderbookSchema = z.infer<typeof getOrderbookSchema>;
+
 // 주식 검색 쿼리 파라미터 검증
 export const searchStockSchema = z.object({
   q: z

@@ -16,17 +16,22 @@ const convertKeysToCamel = (data: any): any => {
   return data;
 };
 
+type SendOptions = {
+  skipCamelCase?: boolean;
+};
+
 // 성공 응답
 export const sendSuccess = <T = any>(
   res: Response,
   statusCode: number = 200,
   message: string = "Success",
-  data?: T
+  data?: T,
+  options?: SendOptions
 ): Response => {
   return res.status(statusCode).json({
     success: true,
     message,
-    data: convertKeysToCamel(data),
+    data: options?.skipCamelCase ? data : convertKeysToCamel(data),
   });
 };
 

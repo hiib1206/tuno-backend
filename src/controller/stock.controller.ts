@@ -1,9 +1,10 @@
 import { NextFunction, Request, Response } from "express";
-import { handleTunoAiAxiosError, tunoAiClient } from "../config/tunoAiClient";
 import prisma from "../config/prisma";
+import { handleTunoAiAxiosError, tunoAiClient } from "../config/tunoAiClient";
 import {
   GetDomesticFinancialSummarySchema,
   GetDomesticStockQuoteSchema,
+  GetOrderbookSchema,
   GetStockCandleSchema,
   GetStockMasterSchema,
   GetWatchlistSchema,
@@ -11,13 +12,13 @@ import {
   ToggleWatchlistSchema,
   UpdateWatchlistOrderSchema,
 } from "../schema/stock.schema";
-import { StockCandleItem, StockInfo, StockSearchResult } from "../types/stock";
+import { StockCandleItem, StockInfo, StockOrderbook, StockSearchResult } from "../types/stock";
 import { sendError, sendSuccess } from "../utils/commonResponse";
 import {
   unixTimestampToYyyymmdd,
   yyyymmddToUnixTimestamp,
 } from "../utils/date";
-import { toDomesticStockQuote } from "../utils/stock";
+import { toDomesticStockQuote, toOrderbook } from "../utils/stock";
 import { UserPayload } from "../utils/token";
 
 // 관심종목 한계 초과 에러
@@ -316,6 +317,34 @@ export const getStockQuote = async (
     const data = toDomesticStockQuote(response.data.output);
 
     return sendSuccess(res, 200, "주식 현재가 시세를 조회했습니다.", data);
+  } catch (error) {
+    if (handleTunoAiAxiosError(res, error)) return;
+    next(error);
+  }
+};
+
+// 주식호가 조회 (tuno-ai 프록시)
+export const getOrderbook = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const stockCode = req.validated?.params?.code as string;
+    const { market_division_code } = req.validated?.query as GetOrderbookSchema;
+
+    const response = await tunoAiClient.get(
+      `/api/v1/domestic-stocks/${stockCode}/orderbook`,
+      {
+        params: { market_division_code },
+        timeout: 5000,
+      }
+    );
+
+    const data: StockOrderbook = toOrderbook(response.data.output1);
+    return sendSuccess(res, 200, "주식 호가를 조회했습니다.", data, {
+      skipCamelCase: true,
+    });
   } catch (error) {
     if (handleTunoAiAxiosError(res, error)) return;
     next(error);
