@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `ai_inference_history` MODIFY `status` ENUM('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED') NOT NULL DEFAULT 'PENDING';
+
+-- AlterTable
+ALTER TABLE `user` ALTER COLUMN `updated_at` DROP DEFAULT;

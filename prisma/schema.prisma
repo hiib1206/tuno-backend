@@ -38,6 +38,7 @@ model user {
   stock_watch_list         stock_watch_list[]
   received_notifications   notification[] @relation("ReceivedNotifications")
   actor_notifications      notification[] @relation("ActorNotifications")
+  ai_inference_histories   ai_inference_history[]
 
   @@index([is_active], map: "User_is_active_idx")
 }
@@ -449,4 +450,40 @@ model krx_stock_summary {
   summary        String   @db.Text /// 기업개요
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
+}
+
+enum ai_model_type {
+  SNAPBACK       // 반등 예측 모델
+  QUANT_SIGNAL   // 퀀트 시그널 모델
+}
+
+enum inference_status {
+  PENDING     // 요청됨, 처리 대기 중
+  PROCESSING  // 처리 중
+  COMPLETED   // 완료
+  FAILED      // 실패
+  CANCELED   // 취소
+}
+
+model ai_inference_history {
+  id             BigInt           @id @default(autoincrement())
+  user_id        Int?
+  model_type     ai_model_type    // 어떤 AI인지
+  model_version  String?          @db.VarChar(20)  // 모델 버전 (선택)
+  ticker         String?          @db.VarChar(16)  // 종목코드 (빠른 조회용)
+  exchange       String?          @db.VarChar(4)   // 거래소 코드 (KP, KQ, NAS, NYS, AMS)
+  request_params Json             // 입력 파라미터 (ticker, date 등)
+  response_data  Json?            // 추론 결과 (전체 JSON)
+  status         inference_status @default(PENDING)
+  latency_ms     Int?             // 추론 소요 시간(ms)
+  requested_at   DateTime         @default(now())
+  completed_at   DateTime?
+  deleted_at     DateTime?        // 사용자 삭제 시점 (null이면 활성)
+
+  user           user?            @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id, model_type, deleted_at, requested_at(sort: Desc)])  // 유저별 모델별 조회
+  @@index([user_id, ticker, deleted_at, requested_at(sort: Desc)])      // 유저별 종목별 조회
+  @@index([model_type, requested_at(sort: Desc)])                        // 모델별 최신순
+  @@index([status, model_type])                                          // 상태별 조회 (모니터링)
 }
