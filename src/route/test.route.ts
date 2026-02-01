@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   testAccessToken,
   testFileUpload,
+  testLS,
   testRedis,
   testResponse,
 } from "../controller/test.controller";
@@ -18,5 +19,7 @@ testRouter.get("/response", testResponse);
 testRouter.post("/upload", uploadProfileImageMiddleware, testFileUpload);
 // POST api/test/redis
 testRouter.post("/redis", testRedis);
+// GET api/test/ls
+testRouter.get("/ls", testLS);
 
 export default testRouter;

@@ -3,6 +3,8 @@ import fs from "fs";
 import path from "path";
 import prisma from "../config/prisma";
 import redis from "../config/redis";
+import { handleLSError } from "../securities/ls";
+import { getSpecialThemes } from "../securities/ls/api/t1533";
 import { sendError, sendSuccess } from "../utils/commonResponse";
 import { UserPayload } from "../utils/token";
 import { toUserResponse } from "../utils/user";
@@ -125,6 +127,29 @@ export const testRedis = async (
       }
     );
   } catch (error) {
+    next(error);
+  }
+};
+
+// LS증권 API 테스트
+export const testLS = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const result = await getSpecialThemes({
+      gubun: "1",
+      chgdate: 0,
+    });
+
+    return sendSuccess(res, 200, "LS증권 API 테스트 성공", {
+      info: result.info,
+      count: result.themes.length,
+      data: result.themes,
+    });
+  } catch (error) {
+    if (handleLSError(res, error)) return;
     next(error);
   }
 };
