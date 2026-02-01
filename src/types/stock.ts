@@ -51,6 +51,7 @@ export type StockSearchResult = StockInfo & {
   type: "domestic" | "overseas"; // 검색 결과 타입
 };
 
+// 원본 호가 타입과는 많이 다릅니다(실시간 호가 타입에 맞춰준것)
 export type StockOrderbook = {
   /** 유가증권 단축 종목코드 */
   MKSC_SHRN_ISCD?: string;

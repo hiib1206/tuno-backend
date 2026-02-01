@@ -4,6 +4,7 @@ import { handleTunoAiAxiosError, tunoAiClient } from "../config/tunoAiClient";
 import {
   GetDomesticFinancialSummarySchema,
   GetDomesticStockQuoteSchema,
+  GetIndexCandleSchema,
   GetOrderbookSchema,
   GetStockCandleSchema,
   GetStockMasterSchema,
@@ -79,7 +80,6 @@ export const getStockMaster = async (
     const stockCode = req.validated?.params?.code as string;
     const { market, exchange } = req.validated?.query as GetStockMasterSchema;
     const currentUserId = (req.user as UserPayload)?.userId ?? undefined;
-
     let stockInfo: StockInfo | null = null;
 
     if (market === "KR") {
@@ -133,7 +133,6 @@ export const getStockMaster = async (
         };
       }
     }
-
     if (!stockInfo) {
       return sendError(res, 404, "종목 정보를 찾을 수 없습니다.");
     }
@@ -286,6 +285,87 @@ export const getStockCandle = async (
 
     return sendSuccess(res, 200, "주가 캔들 데이터를 조회했습니다.", {
       market,
+      code,
+      interval,
+      count: candles.length,
+      candles,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 국내 지수 캔들 데이터 조회
+const INTERVAL_TO_PERIOD: Record<string, string> = {
+  "1d": "D",
+  "1w": "W",
+  "1m": "M",
+  "1y": "Y",
+};
+
+export const getIndexCandle = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { code, interval, limit, from, to } = req.validated
+      ?.query as GetIndexCandleSchema;
+
+    const periodDivCode = INTERVAL_TO_PERIOD[interval];
+
+    // 날짜 범위 처리
+    const isPeriodMode = from !== undefined && to !== undefined;
+    const isScrollMode = to !== undefined && limit !== undefined;
+    const isLimitOnly =
+      limit !== undefined && from === undefined && to === undefined;
+
+    const whereClause: any = {
+      bstp_cls_code: code,
+      period_div_code: periodDivCode,
+    };
+
+    if (isPeriodMode) {
+      const fromDate = unixTimestampToYyyymmdd(from);
+      const toDate = unixTimestampToYyyymmdd(to);
+      whereClause.stck_bsop_date = {
+        gte: fromDate,
+        lte: toDate,
+      };
+    } else if (isScrollMode) {
+      const toDate = unixTimestampToYyyymmdd(to);
+      whereClause.stck_bsop_date = {
+        lte: toDate,
+      };
+    }
+
+    const needsDescOrder = isScrollMode || isLimitOnly;
+
+    const indexData = await prisma.domestic_bstp_period.findMany({
+      where: whereClause,
+      orderBy: {
+        stck_bsop_date: needsDescOrder ? "desc" : "asc",
+      },
+      ...(needsDescOrder && { take: limit }),
+    });
+
+    const sortedData = needsDescOrder
+      ? [...indexData].reverse()
+      : indexData;
+
+    const candles: StockCandleItem[] = sortedData.map(
+      (item): StockCandleItem => ({
+        time: yyyymmddToUnixTimestamp(item.stck_bsop_date),
+        open: item.bstp_nmix_oprc ? parseFloat(item.bstp_nmix_oprc) : 0,
+        high: item.bstp_nmix_hgpr ? parseFloat(item.bstp_nmix_hgpr) : 0,
+        low: item.bstp_nmix_lwpr ? parseFloat(item.bstp_nmix_lwpr) : 0,
+        close: item.bstp_nmix_prpr ? parseFloat(item.bstp_nmix_prpr) : 0,
+        volume: item.acml_vol ? parseFloat(item.acml_vol) : 0,
+        turnover: item.acml_tr_pbmn ? parseFloat(item.acml_tr_pbmn) : 0,
+      })
+    );
+
+    return sendSuccess(res, 200, "지수 캔들 데이터를 조회했습니다.", {
       code,
       interval,
       count: candles.length,

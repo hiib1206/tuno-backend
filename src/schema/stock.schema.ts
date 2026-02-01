@@ -114,6 +114,57 @@ export const getStockCandleSchema = z
 
 export type GetStockCandleSchema = z.infer<typeof getStockCandleSchema>;
 
+// 국내 지수 캔들 데이터 조회 쿼리 파라미터 검증
+export const getIndexCandleSchema = z
+  .object({
+    code: z
+      .string()
+      .min(1, "업종 코드를 입력해주세요.")
+      .max(4, "업종 코드는 최대 4자리입니다."),
+    interval: z.enum(["1d", "1w", "1m", "1y"], {
+      message:
+        "interval은 '1d'(일), '1w'(주), '1m'(월), '1y'(년) 중 하나여야 합니다.",
+    }),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1, "limit은 최소 1이어야 합니다.")
+      .max(1000, "limit은 최대 1000입니다.")
+      .optional(),
+    from: z.preprocess((val) => {
+      if (val === undefined || val === null || val === "") return undefined;
+      if (typeof val === "string") return parseInt(val, 10);
+      if (typeof val === "number") return val;
+      return undefined;
+    }, z.number().int().min(0).optional()),
+    to: z.preprocess((val) => {
+      if (val === undefined || val === null || val === "") return undefined;
+      if (typeof val === "string") return parseInt(val, 10);
+      if (typeof val === "number") return val;
+      return undefined;
+    }, z.number().int().min(0).optional()),
+  })
+  .refine(
+    (data) => {
+      const hasFromTo = data.from !== undefined && data.to !== undefined;
+      const hasToLimit = data.to !== undefined && data.limit !== undefined;
+      const hasLimitOnly =
+        data.limit !== undefined &&
+        data.from === undefined &&
+        data.to === undefined;
+
+      if (hasFromTo && data.limit !== undefined) return false;
+
+      return hasFromTo || hasToLimit || hasLimitOnly;
+    },
+    {
+      message:
+        "기간 조회: from+to, 과거 스크롤: to+limit, 최근 조회: limit만 제공해야 합니다.",
+    }
+  );
+
+export type GetIndexCandleSchema = z.infer<typeof getIndexCandleSchema>;
+
 // 국내 주식 현재가 조회 쿼리 파라미터 검증
 export const getDomesticStockQuoteSchema = z.object({
   market_division_code: z.enum(["J", "NX", "UN"], {

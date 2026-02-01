@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   deleteAllWatchlist,
   getDomesticFinancialSummary,
+  getIndexCandle,
   getOrderbook,
   getStockCandle,
   getStockMaster,
@@ -19,6 +20,7 @@ import { validateMiddleware } from "../middleware/validation.middleware";
 import {
   getDomesticFinancialSummarySchema,
   getDomesticStockQuoteSchema,
+  getIndexCandleSchema,
   getOrderbookSchema,
   getStockCandleSchema,
   getStockCodeSchema,
@@ -38,6 +40,15 @@ stockRouter.get(
     query: getStockCandleSchema,
   }),
   getStockCandle
+);
+
+// GET /api/stock/index/candle?code=0001&interval=1d&limit=250
+stockRouter.get(
+  "/index/candle",
+  validateMiddleware({
+    query: getIndexCandleSchema,
+  }),
+  getIndexCandle
 );
 
 // GET /api/stock/search?q=삼성&type=all&limit=10
