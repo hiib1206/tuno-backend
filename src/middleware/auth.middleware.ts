@@ -18,23 +18,13 @@ export const verifyAccessTokenMiddleware = (
   try {
     const authHeader = req.headers.authorization;
 
-    // SSE 등 헤더 사용 불가 시 query parameter에서 토큰 추출
-    const queryToken = req.query.token as string | undefined;
-
-    let token: string | undefined;
-
-    if (authHeader) {
-      const [bearer, headerToken] = authHeader.split(" ");
-      if (bearer !== "Bearer") {
-        return sendError(res, 401, "Bearer token 형식이 올바르지 않습니다.");
-      }
-      token = headerToken;
-    } else if (queryToken) {
-      token = queryToken;
+    if (!authHeader) {
+      return sendError(res, 401, "access token이 존재하지 않습니다.");
     }
 
-    if (!token) {
-      return sendError(res, 401, "access token이 존재하지 않습니다.");
+    const [bearer, token] = authHeader.split(" ");
+    if (bearer !== "Bearer" || !token) {
+      return sendError(res, 401, "Bearer token 형식이 올바르지 않습니다.");
     }
 
     // decoded: { userId: number }
