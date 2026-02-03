@@ -5,9 +5,36 @@ import type {
   LSRequestOptions,
   LSResponseHeaders,
 } from "./commonTypes";
-import { HTTP_CONFIG, LS_BASE_URL } from "./constants";
+import { HTTP_CONFIG, LS_BASE_URL, TR_RATE_LIMIT_MS } from "./constants";
 import { LSError } from "./errors";
 import { forceRefreshToken, getValidToken } from "./token";
+
+// TR별 인메모리 rate limiter
+const trLastCallTime = new Map<string, number>();
+const trQueue = new Map<string, Promise<void>>();
+
+async function waitForRateLimit(trCode: string): Promise<void> {
+  const intervalMs = TR_RATE_LIMIT_MS[trCode] ?? TR_RATE_LIMIT_MS.default;
+
+  // 이전 대기열이 끝날 때까지 기다린 뒤, 간격 보장
+  const prev = trQueue.get(trCode) ?? Promise.resolve();
+
+  let resolve: () => void;
+  const current = new Promise<void>((r) => {
+    resolve = r;
+  });
+  trQueue.set(trCode, current);
+
+  await prev;
+
+  const now = Date.now();
+  const last = trLastCallTime.get(trCode) ?? 0;
+  const wait = Math.max(0, intervalMs - (now - last));
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+
+  trLastCallTime.set(trCode, Date.now());
+  resolve!();
+}
 
 // Axios 인스턴스
 const axiosInstance: AxiosInstance = axios.create({
@@ -40,6 +67,9 @@ export const lsRequest = async <T>(
   retryOnTokenError: boolean = true
 ): Promise<T> => {
   const { trCode, path, body, continuation, timeout } = options;
+
+  // TR별 호출 간격 보장
+  await waitForRateLimit(trCode);
 
   try {
     const token = await getValidToken();
@@ -95,6 +125,9 @@ export const lsRequestWithContinuation = async <T>(
   retryOnTokenError: boolean = true
 ): Promise<{ data: T; headers: LSResponseHeaders }> => {
   const { trCode, path, body, continuation, timeout } = options;
+
+  // TR별 호출 간격 보장
+  await waitForRateLimit(trCode);
 
   try {
     const token = await getValidToken();

@@ -20,6 +20,11 @@ export const HTTP_CONFIG = {
   DEFAULT_TIMEOUT: 10000, // 10초
 } as const;
 
+// TR별 호출 간격 (ms) — 기본 1초
+export const TR_RATE_LIMIT_MS: Record<string, number> = {
+  default: 1000,
+};
+
 // API 경로
 export const API_PATH = {
   TOKEN: "/oauth2/token",
