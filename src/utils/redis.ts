@@ -37,11 +37,13 @@ export async function getWithLock<T>(
     }
   }
 
-  // 5) lock 못 잡은 요청 → 대기 후 캐시 재조회
-  await new Promise((r) => setTimeout(r, 200));
-  const retried = await redis.get(cacheKey);
-  if (retried) return JSON.parse(retried);
+  // 5) lock 못 잡은 요청 → 200ms 간격으로 캐시 재조회 (최대 lockTtl만큼 대기)
+  const maxRetries = Math.ceil(lockTtlMs / 200);
+  for (let i = 0; i < maxRetries; i++) {
+    await new Promise((r) => setTimeout(r, 200));
+    const retried = await redis.get(cacheKey);
+    if (retried) return JSON.parse(retried);
+  }
 
-  // 6) fallback: 그래도 없으면 직접 호출
-  return fetcher();
+  throw new Error(`Cache fetch timeout: ${cacheKey}`);
 }
