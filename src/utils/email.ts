@@ -1,8 +1,8 @@
-import sgMail from "@sendgrid/mail";
+import { Resend } from "resend";
 import { env } from "../config/env";
 
-// SendGrid 초기화
-sgMail.setApiKey(env.SENDGRID_API_KEY);
+// Resend 초기화
+const resend = new Resend(env.RESEND_API_KEY);
 
 /**
  * 6자리 랜덤 숫자 인증 코드 생성
@@ -23,16 +23,16 @@ export async function sendVerificationEmail(
   to: string,
   code: string
 ): Promise<void> {
-  // 에메랄드 그린 색상 (프로젝트 accent 색상 기반)
-  const primaryColor = "#10b981"; // emerald-500
-  const primaryColorDark = "#059669"; // emerald-600
-  const primaryColorLight = "#d1fae5"; // emerald-100
-  const textColor = "#1f2937"; // gray-800
-  const textColorSecondary = "#6b7280"; // gray-500
-  const textColorLight = "#9ca3af"; // gray-400
-  const borderColor = "#e5e7eb"; // gray-200
-  const bgColor = "#ffffff";
-  const bgColorSecondary = "#f9fafb"; // gray-50
+  const brand = "#00AE43";
+  const textPrimary = "#111111";
+  const textSecondary = "#888888";
+  const bgPage = "#f7f7f7";
+  const bgCard = "#ffffff";
+  const bgCode = "#f9fafb";
+  const borderCode = "#e5e5e5";
+  const divider = "#f0f0f0";
+  const expiresIn = Math.floor(env.EMAIL_CODE_EXPIRES_IN / 60);
+  const year = new Date().getFullYear();
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -50,100 +50,81 @@ export async function sendVerificationEmail(
         </style>
         <![endif]-->
       </head>
-      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; background-color: #f3f4f6; line-height: 1.6;">
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f3f4f6;">
+      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: ${bgPage}; line-height: 1.5; -webkit-font-smoothing: antialiased;">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: ${bgPage};">
           <tr>
-            <td align="center" style="padding: 40px 20px;">
-              <!-- Main Container -->
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; background-color: ${bgColor}; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); overflow: hidden;">
+            <td align="center" style="padding: 48px 20px;">
 
-                <!-- Header with Gradient -->
+              <!-- Card -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 480px; background-color: ${bgCard}; border-radius: 16px; overflow: hidden;">
+
+                <!-- Brand Bar -->
                 <tr>
-                  <td style="background: linear-gradient(135deg, ${primaryColor} 0%, ${primaryColorDark} 100%); padding: 32px 40px; text-align: center;">
-                    <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600; letter-spacing: -0.5px;">
-                      이메일 인증
-                    </h1>
+                  <td style="height: 3px; background-color: ${brand};"></td>
+                </tr>
+
+                <!-- Logo -->
+                <tr>
+                  <td style="padding: 40px 40px 0 40px; text-align: center;">
+                    <span style="font-size: 30px; font-weight: 700; color: ${brand}; letter-spacing: -0.5px;">Tuno</span>
                   </td>
                 </tr>
 
-                <!-- Content -->
+                <!-- Body -->
                 <tr>
-                  <td style="padding: 40px;">
-                    <!-- Greeting -->
-                    <p style="margin: 0 0 16px 0; color: ${textColor}; font-size: 16px; font-weight: 500;">
-                      안녕하세요,
-                    </p>
-                    <p style="margin: 0 0 32px 0; color: ${textColor}; font-size: 15px; line-height: 1.7;">
-                      아래 인증 코드를 입력하여 이메일 인증을 완료해주세요.
+                  <td style="padding: 32px 40px 40px 40px;">
+
+                    <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 600; color: ${textPrimary}; text-align: center; letter-spacing: -0.3px;">
+                      이메일 인증
+                    </h1>
+                    <p style="margin: 0 0 32px 0; font-size: 14px; color: ${textSecondary}; text-align: center; line-height: 1.6;">
+                      아래 코드를 입력하여 인증을 완료해주세요.
                     </p>
 
-                    <!-- Verification Code Box -->
+                    <!-- Code -->
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                       <tr>
-                        <td align="center" style="padding: 0 0 32px 0;">
-                          <div style="background: linear-gradient(135deg, ${primaryColorLight} 0%, #ecfdf5 100%); border: 2px solid ${primaryColor}; border-radius: 12px; padding: 32px 24px; text-align: center; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);">
-                            <p style="margin: 0 0 8px 0; color: ${textColorSecondary}; font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">
-                              인증 코드
-                            </p>
-                            <h2 style="margin: 0; color: ${primaryColorDark}; font-size: 40px; font-weight: 700; letter-spacing: 8px; font-family: 'Courier New', monospace; text-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">
+                        <td align="center">
+                          <div style="display: inline-block; padding: 20px 40px; background-color: ${bgCode}; border: 1px solid ${borderCode}; border-radius: 12px;">
+                            <span style="font-size: 36px; font-weight: 700; letter-spacing: 10px; color: ${textPrimary}; font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;">
                               ${code}
-                            </h2>
+                            </span>
                           </div>
                         </td>
                       </tr>
                     </table>
 
-                    <!-- Info Section -->
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                      <tr>
-                        <td style="background-color: ${bgColorSecondary}; border-left: 4px solid ${primaryColor}; border-radius: 6px; padding: 16px 20px;">
-                          <p style="margin: 0; color: ${textColorSecondary}; font-size: 14px; line-height: 1.6;">
-                            <strong style="color: ${textColor};"> 이 코드는 </strong><strong style="color: ${primaryColorDark};">${
-    env.SENDGRID_EXPIRES_IN
-  }분간</strong><strong style="color: ${textColor};"> 유효합니다.</strong><br>
-                            <strong style="color: ${textColor};">이 요청을 하지 않으셨다면 이 이메일을 무시하셔도 됩니다.</strong>
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
+                    <!-- Timer -->
+                    <p style="margin: 20px 0 0 0; font-size: 13px; color: ${textSecondary}; text-align: center;">
+                      <span style="color: ${brand}; font-weight: 600;">${expiresIn}분</span> 후 만료됩니다
+                    </p>
 
                     <!-- Divider -->
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                       <tr>
-                        <td style="padding: 32px 0 0 0;">
-                          <hr style="border: none; border-top: 1px solid ${borderColor}; margin: 0;">
+                        <td style="padding: 32px 0;">
+                          <div style="height: 1px; background-color: ${divider};"></div>
                         </td>
                       </tr>
                     </table>
 
-                    <!-- Footer -->
-                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
-                      <tr>
-                        <td style="padding: 24px 0 0 0; text-align: center;">
-                          <p style="margin: 0; color: ${textColorLight}; font-size: 12px; line-height: 1.5;">
-                            이 이메일은 자동으로 발송되었습니다.<br>
-                            문의사항이 있으시면 고객센터로 연락해주세요.
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
+                    <!-- Notice -->
+                    <p style="margin: 0; font-size: 13px; color: ${textSecondary}; text-align: center; line-height: 1.7;">
+                      본인이 요청하지 않았다면 이 메일을 무시해주세요.<br>
+                      코드를 타인과 공유하지 마세요.
+                    </p>
 
                   </td>
                 </tr>
 
-                <!-- Bottom Accent -->
-                <tr>
-                  <td style="height: 4px; background: linear-gradient(90deg, ${primaryColor} 0%, ${primaryColorDark} 100%);"></td>
-                </tr>
-
               </table>
 
-              <!-- Spacer -->
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px;">
+              <!-- Footer -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 480px;">
                 <tr>
-                  <td style="padding: 20px 0 0 0; text-align: center;">
-                    <p style="margin: 0; color: ${textColorLight}; font-size: 11px;">
-                      © ${new Date().getFullYear()} Tuno. All rights reserved.
+                  <td style="padding: 24px 0 0 0; text-align: center;">
+                    <p style="margin: 0; font-size: 11px; color: ${textSecondary};">
+                      &copy; ${year} Tuno. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -156,34 +137,28 @@ export async function sendVerificationEmail(
     </html>
   `;
 
-  const textContent = `
-이메일 인증
+  const textContent = `이메일 인증
 
-안녕하세요,
-
-아래 인증 코드를 입력하여 이메일 인증을 완료해주세요.
+아래 코드를 입력하여 인증을 완료해주세요.
 
 인증 코드: ${code}
 
-이 코드는 ${env.SENDGRID_EXPIRES_IN}분간 유효합니다.
-이 요청을 하지 않으셨다면 이 이메일을 무시하셔도 됩니다.
+${expiresIn}분 후 만료됩니다.
+본인이 요청하지 않았다면 이 메일을 무시해주세요.
+코드를 타인과 공유하지 마세요.
 
-이 이메일은 자동으로 발송되었습니다.
-문의사항이 있으시면 고객센터로 연락해주세요.
-
-© ${new Date().getFullYear()} Tuno. All rights reserved.
+© ${year} Tuno. All rights reserved.
   `;
 
-  const msg = {
-    to,
-    from: {
-      email: env.SENDGRID_FROM_EMAIL, //발신자 이메일
-      name: env.SENDGRID_FROM_NAME, //발신자 이름
-    },
+  const { error } = await resend.emails.send({
+    from: `${env.RESEND_FROM_NAME} <${env.RESEND_FROM_EMAIL}>`,
+    to: [to],
     subject: "Tuno 회원 이메일 인증 요청",
     text: textContent,
     html: htmlContent,
-  };
+  });
 
-  await sgMail.send(msg);
+  if (error) {
+    throw new Error(`이메일 발송 실패: ${error.message}`);
+  }
 }

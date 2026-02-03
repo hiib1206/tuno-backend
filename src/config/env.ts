@@ -27,11 +27,11 @@ const envSchema = z.object({
   ACCESS_TOKEN_EXPIRES_IN: z.string().min(1),
   REFRESH_TOKEN_EXPIRES_IN: z.string().min(1),
 
-  // sendgrid
-  SENDGRID_API_KEY: z.string().min(1),
-  SENDGRID_FROM_EMAIL: z.email(),
-  SENDGRID_FROM_NAME: z.string().optional(),
-  SENDGRID_EXPIRES_IN: z.coerce.number().min(1),
+  // resend
+  RESEND_API_KEY: z.string().min(1),
+  RESEND_FROM_EMAIL: z.email(),
+  RESEND_FROM_NAME: z.string().optional(),
+  EMAIL_CODE_EXPIRES_IN: z.coerce.number().min(1),
 
   // firebase
   FIREBASE_CREDENTIAL: z.string().min(1),
