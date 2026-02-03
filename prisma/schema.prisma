@@ -39,6 +39,7 @@ model user {
   received_notifications   notification[] @relation("ReceivedNotifications")
   actor_notifications      notification[] @relation("ActorNotifications")
   ai_inference_histories   ai_inference_history[]
+  stock_comments           stock_comment[]
 
   @@index([is_active], map: "User_is_active_idx")
 }
@@ -486,4 +487,30 @@ model ai_inference_history {
   @@index([user_id, ticker, deleted_at, requested_at(sort: Desc)])      // 유저별 종목별 조회
   @@index([model_type, requested_at(sort: Desc)])                        // 모델별 최신순
   @@index([status, model_type])                                          // 상태별 조회 (모니터링)
+}
+
+// 종목 댓글 의견 태그
+enum stock_opinion {
+  BUY      // 매수
+  SELL     // 매도
+  NEUTRAL  // 중립
+}
+
+// 종목 댓글 (stock_comment)
+model stock_comment {
+  id         BigInt        @id @default(autoincrement())
+  ticker     String        @db.VarChar(9)   // 종목 단축코드
+  exchange   String        @db.VarChar(4)   // 거래소 코드 (KP, KQ, NAS, NYS, AMS 등)
+  content    String        @db.Text
+  opinion    stock_opinion // 매수/매도/중립
+
+  author_id  Int
+  author     user          @relation(fields: [author_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime      @default(now())
+  updated_at DateTime      @updatedAt
+  deleted_at DateTime?
+
+  @@index([ticker, deleted_at, created_at])
+  @@index([author_id, deleted_at, created_at])
 }
