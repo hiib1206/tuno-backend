@@ -24,6 +24,7 @@ import {
   setRefreshTokenCookie,
   UserPayload,
 } from "../utils/token";
+import { generateNick } from "../utils/nick";
 import { toUserResponse } from "../utils/user";
 
 // UUID 형식 검증 (모든 UUID 버전 지원)
@@ -550,7 +551,6 @@ export const googleCallback = async (
     }
 
     const email = profile.emails[0].value;
-    const displayName = profile.displayName || email.split("@")[0];
     const provider = AUTH_PROVIDERS.GOOGLE;
     const providerId = profile.id;
 
@@ -591,26 +591,29 @@ export const googleCallback = async (
       }
     }
 
-    // 3단계: 신규 사용자 생성
+    // 3단계: 신규 사용자 생성 (nick 충돌 시 재시도)
     if (!user) {
-      // nick은 중복 방지를 위해 랜덤 문자열 추가
-      // 예) nick_a4f3
-      const shortId = crypto.randomBytes(4).toString("hex");
-      const nick = `${displayName}_${shortId}`;
-
-      user = await prisma.user.create({
-        data: {
-          email,
-          nick,
-          email_verified_at: new Date(), // Google 로그인은 이메일이 이미 인증됨
-          auth_providers: {
-            create: {
-              provider,
-              provider_user_id: providerId,
+      const MAX_RETRY = 3;
+      for (let i = 0; i < MAX_RETRY; i++) {
+        try {
+          user = await prisma.user.create({
+            data: {
+              email,
+              nick: generateNick(),
+              email_verified_at: new Date(),
+              auth_providers: {
+                create: {
+                  provider,
+                  provider_user_id: providerId,
+                },
+              },
             },
-          },
-        },
-      });
+          });
+          break;
+        } catch (e: any) {
+          if (e.code !== "P2002" || i === MAX_RETRY - 1) throw e;
+        }
+      }
     }
 
     // 4. JWT 토큰 생성 및 저장
@@ -619,7 +622,7 @@ export const googleCallback = async (
     const clientIp = getClientIp(req);
 
     await saveRefreshToken(
-      user.id,
+      user!.id,
       deviceId,
       refreshToken,
       userAgent,
@@ -712,8 +715,6 @@ export const naverCallback = async (
 
     const provider = AUTH_PROVIDERS.NAVER;
     const providerId = profile.id;
-    // 네이버는 profile.email이 연락처용 이메일이므로 신뢰할 수 없음
-    const displayName = profile.nickname || profile.name || `user`;
 
     // 1단계: provider + provider_id로 조회 (이미 소셜 계정이 연결된 경우)
     const authProvider = await prisma.auth_provider.findUnique({
@@ -727,24 +728,28 @@ export const naverCallback = async (
     });
     let user = authProvider?.user ?? null;
 
-    // 2단계: 신규 사용자 생성
+    // 2단계: 신규 사용자 생성 (nick 충돌 시 재시도)
     // Naver는 email 기반 통합을 하지 않음 (email이 연락처용이므로 신뢰 불가)
     if (!user) {
-      // nick은 중복 방지를 위해 랜덤 문자열 추가
-      const shortId = crypto.randomBytes(4).toString("hex");
-      const nick = `${displayName}_${shortId}`;
-
-      user = await prisma.user.create({
-        data: {
-          nick,
-          auth_providers: {
-            create: {
-              provider,
-              provider_user_id: providerId,
+      const MAX_RETRY = 3;
+      for (let i = 0; i < MAX_RETRY; i++) {
+        try {
+          user = await prisma.user.create({
+            data: {
+              nick: generateNick(),
+              auth_providers: {
+                create: {
+                  provider,
+                  provider_user_id: providerId,
+                },
+              },
             },
-          },
-        },
-      });
+          });
+          break;
+        } catch (e: any) {
+          if (e.code !== "P2002" || i === MAX_RETRY - 1) throw e;
+        }
+      }
     }
 
     // 4. 토큰 생성 및 저장
@@ -753,7 +758,7 @@ export const naverCallback = async (
     const clientIp = getClientIp(req);
 
     await saveRefreshToken(
-      user.id,
+      user!.id,
       deviceId,
       refreshToken,
       userAgent,
@@ -846,8 +851,6 @@ export const kakaoCallback = async (
 
     const provider = AUTH_PROVIDERS.KAKAO;
     const providerId = String(profile.id); // 숫자로 올 수 있으므로 문자열로 변환
-    // 카카오는 이메일을 제공할 수 있지만 신뢰할 수 없으므로 email 기반 통합을 하지 않음
-    const displayName = profile.displayName || profile.username || `kakao`;
 
     // 1단계: provider + provider_id로 조회 (이미 소셜 계정이 연결된 경우)
     const authProvider = await prisma.auth_provider.findUnique({
@@ -861,24 +864,28 @@ export const kakaoCallback = async (
     });
     let user = authProvider?.user ?? null;
 
-    // 2단계: 신규 사용자 생성
+    // 2단계: 신규 사용자 생성 (nick 충돌 시 재시도)
     // Kakao는 email 기반 통합을 하지 않음 (email이 신뢰할 수 없을 수 있음)
     if (!user) {
-      // nick은 중복 방지를 위해 랜덤 문자열 추가
-      const shortId = crypto.randomBytes(4).toString("hex");
-      const nick = `${displayName}_${shortId}`;
-
-      user = await prisma.user.create({
-        data: {
-          nick,
-          auth_providers: {
-            create: {
-              provider,
-              provider_user_id: providerId,
+      const MAX_RETRY = 3;
+      for (let i = 0; i < MAX_RETRY; i++) {
+        try {
+          user = await prisma.user.create({
+            data: {
+              nick: generateNick(),
+              auth_providers: {
+                create: {
+                  provider,
+                  provider_user_id: providerId,
+                },
+              },
             },
-          },
-        },
-      });
+          });
+          break;
+        } catch (e: any) {
+          if (e.code !== "P2002" || i === MAX_RETRY - 1) throw e;
+        }
+      }
     }
 
     // 6. JWT 토큰 생성 및 저장
@@ -887,7 +894,7 @@ export const kakaoCallback = async (
     const clientIp = getClientIp(req);
 
     await saveRefreshToken(
-      user.id,
+      user!.id,
       deviceId,
       refreshToken,
       userAgent,
