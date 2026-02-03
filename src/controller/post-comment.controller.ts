@@ -10,7 +10,7 @@ import {
 import { sendToUser } from "../service/sse.service";
 import { sendError, sendSuccess } from "../utils/commonResponse";
 import { CommentNotificationData, ReplyNotificationData } from "../types/notification";
-import { notification_type, SSEEvent } from "../utils/notification";
+import { notification_type, SSEEvent, toNotificationResponse } from "../utils/notification";
 import { toPostCommentResponse } from "../utils/post-comment";
 import { UserPayload } from "../utils/token";
 
@@ -134,12 +134,19 @@ export const createPostComment = async (
               type: notification_type.REPLY,
               data: notificationData,
             },
+            include: {
+              actor: {
+                select: { id: true, username: true, nick: true, profile_image_url: true },
+              },
+            },
           });
 
           // SSE로 실시간 알림
-          sendToUser(parentComment.author_id.toString(), SSEEvent.NOTIFICATION_CREATED, {
-            notificationId: notification.id.toString(),
-          });
+          sendToUser(
+            parentComment.author_id.toString(),
+            SSEEvent.NOTIFICATION_CREATED,
+            toNotificationResponse(notification),
+          );
         }
       } else {
         // 일반 댓글인 경우: 글 작성자에게 알림 (본인 제외)
@@ -157,12 +164,19 @@ export const createPostComment = async (
               type: notification_type.COMMENT,
               data: notificationData,
             },
+            include: {
+              actor: {
+                select: { id: true, username: true, nick: true, profile_image_url: true },
+              },
+            },
           });
 
           // SSE로 실시간 알림
-          sendToUser(post.author_id.toString(), SSEEvent.NOTIFICATION_CREATED, {
-            notificationId: notification.id.toString(),
-          });
+          sendToUser(
+            post.author_id.toString(),
+            SSEEvent.NOTIFICATION_CREATED,
+            toNotificationResponse(notification),
+          );
         }
       }
     } catch (notificationError) {

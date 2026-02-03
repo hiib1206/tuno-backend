@@ -36,15 +36,15 @@ export const toNotificationResponse = (notification: NotificationWithActor) => {
     id: notification.id.toString(),
     type: notification.type,
     data: notification.data,
-    read_at: notification.read_at,
-    created_at: notification.created_at,
+    readAt: notification.read_at,
+    createdAt: notification.created_at,
     actor: notification.actor
       ? {
-          id: notification.actor.id.toString(),
-          username: notification.actor.username,
-          nick: notification.actor.nick,
-          profile_image_url: toPublicUrl(notification.actor.profile_image_url),
-        }
+        id: notification.actor.id.toString(),
+        username: notification.actor.username,
+        nick: notification.actor.nick,
+        profileImageUrl: toPublicUrl(notification.actor.profile_image_url),
+      }
       : null,
   };
 };
