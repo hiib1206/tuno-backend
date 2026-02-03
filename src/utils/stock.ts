@@ -1,4 +1,9 @@
-import { DomesticStockQuote, StockOrderbook } from "../types/stock";
+import {
+  DomesticIndexMinuteCandle,
+  DomesticStockQuote,
+  StockOrderbook,
+} from "../types/stock";
+import { yyyymmddToUnixTimestamp } from "./date";
 
 // 빈 문자열, null, undefined -> null
 // 숫자로 파싱 가능한 문자열은 number로 변환
@@ -107,5 +112,21 @@ export const toOrderbook = (output1: any): StockOrderbook => {
     TOTAL_BIDP_RSQN: toNumber(output1.total_bidp_rsqn),
     OVTM_TOTAL_ASKP_RSQN: toNumber(output1.ovtm_total_askp_rsqn),
     OVTM_TOTAL_BIDP_RSQN: toNumber(output1.ovtm_total_bidp_rsqn),
+  };
+};
+
+// tuno-ai 국내 지수 분봉 차트 응답 요소 -> 내부 도메인 타입으로 매핑
+export const toDomesticIndexMinuteCandle = (
+  raw: any
+): DomesticIndexMinuteCandle => {
+  return {
+    date: yyyymmddToUnixTimestamp(raw.stck_bsop_date),
+    time: raw.stck_cntg_hour ?? "",
+    close: toNullableNumber(raw.bstp_nmix_prpr),
+    open: toNullableNumber(raw.bstp_nmix_oprc),
+    high: toNullableNumber(raw.bstp_nmix_hgpr),
+    low: toNullableNumber(raw.bstp_nmix_lwpr),
+    tickVolume: toNullableNumber(raw.cntg_vol),
+    tradingValue: toNullableNumber(raw.acml_tr_pbmn),
   };
 };

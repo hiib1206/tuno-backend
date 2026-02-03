@@ -130,3 +130,14 @@ export type StockOrderbook = {
   OVTM_TOTAL_BIDP_ICDC?: number;
   STCK_DEAL_CLS_CODE?: string;
 };
+
+export type DomesticIndexMinuteCandle = {
+  date: number; // stck_bsop_date → Unix timestamp (초)
+  time: string; // stck_cntg_hour (HHMMSS)
+  close: number | null; // bstp_nmix_prpr
+  open: number | null; // bstp_nmix_oprc
+  high: number | null; // bstp_nmix_hgpr
+  low: number | null; // bstp_nmix_lwpr
+  tickVolume: number | null; // cntg_vol
+  tradingValue: number | null; // acml_tr_pbmn
+};

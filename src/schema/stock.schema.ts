@@ -254,3 +254,33 @@ export const updateWatchlistOrderSchema = z.object({
 export type UpdateWatchlistOrderSchema = z.infer<
   typeof updateWatchlistOrderSchema
 >;
+
+// 국내 지수 현재가 조회 경로 파라미터 검증
+export const getIndexPriceParamsSchema = z.object({
+  industryCode: z
+    .string()
+    .regex(/^\d{4}$/, "업종 코드는 4자리 숫자여야 합니다."),
+});
+export type GetIndexPriceParamsSchema = z.infer<
+  typeof getIndexPriceParamsSchema
+>;
+
+// 국내 지수 분봉 차트 조회 쿼리 파라미터 검증
+export const getIndexMinuteChartQuerySchema = z.object({
+  interval: z
+    .enum(["30", "60", "600", "3600"], {
+      message: "interval은 30, 60, 600, 3600 중 하나여야 합니다.",
+    })
+    .default("60"),
+  include_past_data: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  exclude_after_hours: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+});
+export type GetIndexMinuteChartQuerySchema = z.infer<
+  typeof getIndexMinuteChartQuerySchema
+>;

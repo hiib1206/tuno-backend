@@ -5,6 +5,8 @@ import {
   GetDomesticFinancialSummarySchema,
   GetDomesticStockQuoteSchema,
   GetIndexCandleSchema,
+  GetIndexPriceParamsSchema,
+  GetIndexMinuteChartQuerySchema,
   GetOrderbookSchema,
   GetStockCandleSchema,
   GetStockMasterSchema,
@@ -19,7 +21,11 @@ import {
   unixTimestampToYyyymmdd,
   yyyymmddToUnixTimestamp,
 } from "../utils/date";
-import { toDomesticStockQuote, toOrderbook } from "../utils/stock";
+import {
+  toDomesticIndexMinuteCandle,
+  toDomesticStockQuote,
+  toOrderbook,
+} from "../utils/stock";
 import { UserPayload } from "../utils/token";
 
 // 관심종목 한계 초과 에러
@@ -372,6 +378,41 @@ export const getIndexCandle = async (
       candles,
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+// 국내 지수 분봉 차트 조회 (tuno-ai 프록시)
+export const getIndexMinuteChart = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { industryCode } = req.validated
+      ?.params as GetIndexPriceParamsSchema;
+    const { interval, include_past_data, exclude_after_hours } = req.validated
+      ?.query as GetIndexMinuteChartQuerySchema;
+
+    const response = await tunoAiClient.get(
+      `/api/v1/domestic-indices/${industryCode}/minute-chart`,
+      {
+        params: { interval, include_past_data, exclude_after_hours },
+        timeout: 5000,
+      }
+    );
+
+    const data = (response.data.output2 as any[]).map(
+      toDomesticIndexMinuteCandle
+    );
+    return sendSuccess(
+      res,
+      200,
+      "국내 지수 분봉 차트를 조회했습니다.",
+      data
+    );
+  } catch (error) {
+    if (handleTunoAiAxiosError(res, error)) return;
     next(error);
   }
 };

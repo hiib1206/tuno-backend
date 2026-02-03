@@ -3,6 +3,7 @@ import {
   deleteAllWatchlist,
   getDomesticFinancialSummary,
   getIndexCandle,
+  getIndexMinuteChart,
   getOrderbook,
   getStockCandle,
   getStockMaster,
@@ -21,6 +22,8 @@ import {
   getDomesticFinancialSummarySchema,
   getDomesticStockQuoteSchema,
   getIndexCandleSchema,
+  getIndexPriceParamsSchema,
+  getIndexMinuteChartQuerySchema,
   getOrderbookSchema,
   getStockCandleSchema,
   getStockCodeSchema,
@@ -49,6 +52,16 @@ stockRouter.get(
     query: getIndexCandleSchema,
   }),
   getIndexCandle
+);
+
+// GET /api/stock/index/:industryCode/minute-chart?interval=60
+stockRouter.get(
+  "/index/:industryCode/minute-chart",
+  validateMiddleware({
+    params: getIndexPriceParamsSchema,
+    query: getIndexMinuteChartQuerySchema,
+  }),
+  getIndexMinuteChart
 );
 
 // GET /api/stock/search?q=삼성&type=all&limit=10
