@@ -297,3 +297,35 @@ export const getInferenceHistoryById = async (
     next(error);
   }
 };
+
+export const deleteInferenceHistory = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = (req.user as UserPayload)?.userId;
+    const { id } = req.validated?.params as GetInferenceHistoryByIdParamsSchema;
+
+    const history = await prisma.ai_inference_history.findFirst({
+      where: {
+        id: BigInt(id),
+        user_id: userId,
+        deleted_at: null,
+      },
+    });
+
+    if (!history) {
+      return sendError(res, 404, "추론 이력을 찾을 수 없습니다.");
+    }
+
+    await prisma.ai_inference_history.update({
+      where: { id: history.id },
+      data: { deleted_at: new Date() },
+    });
+
+    return sendSuccess(res, 200, "AI 추론 이력을 삭제했습니다.");
+  } catch (error) {
+    next(error);
+  }
+};

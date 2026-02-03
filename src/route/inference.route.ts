@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  deleteInferenceHistory,
   getInferenceHistory,
   getInferenceHistoryById,
   postQuantSignalInference,
@@ -30,6 +31,14 @@ inferenceRouter.get(
   verifyAccessTokenMiddleware,
   validateMiddleware({ params: getInferenceHistoryByIdParamsSchema }),
   getInferenceHistoryById
+);
+
+// DELETE /api/inference/history/:id - 유저의 AI 추론 이력 삭제 (소프트 딜리트)
+inferenceRouter.delete(
+  "/history/:id",
+  verifyAccessTokenMiddleware,
+  validateMiddleware({ params: getInferenceHistoryByIdParamsSchema }),
+  deleteInferenceHistory
 );
 
 // POST /api/inference/snapback
