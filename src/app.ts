@@ -29,6 +29,7 @@ app.use(
       "http://59.25.224.32:3000",
     ],
     credentials: true,
+    exposedHeaders: ["X-Quota-Limit", "X-Quota-Used", "X-Quota-Remaining", "X-Quota-Reset"],
   })
 );
 app.use(express.json());

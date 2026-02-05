@@ -1,7 +1,15 @@
 import { AxiosError } from "axios";
 import { NextFunction, Request, Response } from "express";
 import prisma from "../config/prisma";
+import redis from "../config/redis";
 import { handleTunoAiAxiosError, tunoAiClient } from "../config/tunoAiClient";
+import {
+  DAILY_INFERENCE_LIMIT,
+  decrementQuota,
+  getQuotaRedisKey,
+  getQuotaResetTimestamp,
+  incrementQuota,
+} from "../utils/role";
 import { ai_model_type, inference_status } from "../generated/prisma/enums";
 import {
   GetInferenceHistoryByIdParamsSchema,
@@ -15,6 +23,7 @@ import {
   SnapbackV2Response,
 } from "../types/inference";
 import { sendError, sendSuccess } from "../utils/commonResponse";
+import { getUserRole } from "../utils/role";
 import { UserPayload } from "../utils/token";
 
 export const postSnapbackInference = async (
@@ -67,6 +76,16 @@ export const postSnapbackInference = async (
       },
     });
 
+    // 성공 시에만 쿼터 카운트 증가
+    const role = req.userRole;
+    const limit = role ? DAILY_INFERENCE_LIMIT[role] : 0;
+    if (limit !== 0) {
+      const newUsage = await incrementQuota(userId);
+      res.setHeader("X-Quota-Used", newUsage.toString());
+      res.setHeader("X-Quota-Remaining", Math.max(0, limit - newUsage).toString());
+      res.setHeader("X-Quota-Reset", getQuotaResetTimestamp().toString());
+    }
+
     return sendSuccess(res, 200, "snapback 추론 결과를 조회했습니다.", response.data);
   } catch (error) {
     // 실패 시 업데이트
@@ -97,7 +116,8 @@ export const postSnapbackInference = async (
 const runQuantSignalInference = async (
   historyId: bigint,
   ticker: string,
-  date: string | null | undefined
+  date: string | null | undefined,
+  userId: number
 ) => {
   const startTime = Date.now();
 
@@ -144,6 +164,9 @@ const runQuantSignalInference = async (
         },
       })
       .catch(() => { });
+
+    // COMPLETED가 아니면 쿼터 환불
+    await decrementQuota(userId).catch(() => { });
   }
 };
 
@@ -191,7 +214,7 @@ export const postQuantSignalInference = async (
     });
 
     // 백그라운드에서 추론 실행 (await 없이)
-    runQuantSignalInference(history.id, ticker, date);
+    runQuantSignalInference(history.id, ticker, date, userId);
 
     // 즉시 historyId 반환
     return sendSuccess(res, 202, "추론 요청이 접수되었습니다.", {
@@ -209,7 +232,7 @@ export const getInferenceHistory = async (
 ) => {
   try {
     const userId = (req.user as UserPayload)?.userId;
-    const { cursor, limit, model_type, ticker, days, status } =
+    const { cursor, limit, model_type, ticker, days, status, all } =
       req.validated?.query as GetInferenceHistoryQuerySchema;
 
     const histories = await prisma.ai_inference_history.findMany({
@@ -224,14 +247,14 @@ export const getInferenceHistory = async (
         ...(status && { status }),
       },
       orderBy: { requested_at: "desc" },
-      take: limit + 1,
-      ...(cursor && {
+      take: all && days ? undefined : limit + 1,
+      ...(!all && cursor && {
         cursor: { id: BigInt(cursor) },
         skip: 1,
       }),
     });
 
-    const hasNext = histories.length > limit;
+    const hasNext = all ? false : histories.length > limit;
     const items = hasNext ? histories.slice(0, -1) : histories;
     const nextCursor = hasNext ? items[items.length - 1]?.id.toString() : null;
 
@@ -292,6 +315,48 @@ export const getInferenceHistoryById = async (
       ...history,
       id: history.id.toString(),
       nameKo,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getQuotaInfo = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = (req.user as UserPayload)?.userId;
+    const role = await getUserRole(userId);
+
+    if (!role) {
+      return sendError(res, 401, "사용자를 찾을 수 없습니다.");
+    }
+
+    const limit = DAILY_INFERENCE_LIMIT[role];
+
+    const resetsAt = getQuotaResetTimestamp();
+
+    if (limit === 0) {
+      return sendSuccess(res, 200, "쿼터 정보를 조회했습니다.", {
+        role,
+        limit: "unlimited",
+        used: 0,
+        remaining: "unlimited",
+        resetsAt,
+      });
+    }
+
+    const redisKey = getQuotaRedisKey(userId);
+    const currentUsage = parseInt((await redis.get(redisKey)) ?? "0", 10);
+
+    return sendSuccess(res, 200, "쿼터 정보를 조회했습니다.", {
+      role,
+      limit,
+      used: currentUsage,
+      remaining: Math.max(0, limit - currentUsage),
+      resetsAt,
     });
   } catch (error) {
     next(error);

@@ -68,7 +68,7 @@ export const getInferenceHistoryQuerySchema = z.object({
       if (typeof val === "string") return parseInt(val, 10);
       if (typeof val === "number") return val;
       return undefined;
-    }, z.number().int().min(1).max(365).optional())
+    }, z.number().int().min(1).max(180).optional())
     .optional(),
 
   status: z
@@ -79,7 +79,14 @@ export const getInferenceHistoryQuerySchema = z.object({
       ]
     )
     .optional(),
-});
+
+  all: z
+    .preprocess((val) => val === "true" || val === true, z.boolean().optional())
+    .optional(),
+}).refine(
+  (data) => !(data.all === true && !data.days),
+  { message: "all=true일 때는 days가 필수입니다.", path: ["all"] }
+);
 
 export type GetInferenceHistoryQuerySchema = z.infer<
   typeof getInferenceHistoryQuerySchema

@@ -3,10 +3,15 @@ import {
   deleteInferenceHistory,
   getInferenceHistory,
   getInferenceHistoryById,
+  getQuotaInfo,
   postQuantSignalInference,
   postSnapbackInference,
 } from "../controller/inference.controller";
 import { verifyAccessTokenMiddleware } from "../middleware/auth.middleware";
+import {
+  checkAndIncrementQuota,
+  checkInferenceQuota,
+} from "../middleware/quota.middleware";
 import { validateMiddleware } from "../middleware/validation.middleware";
 import {
   getInferenceHistoryByIdParamsSchema,
@@ -16,6 +21,9 @@ import {
 } from "../schema/inference.schema";
 
 const inferenceRouter = Router();
+
+// GET /api/inference/quota - 쿼터 사용량 조회
+inferenceRouter.get("/quota", verifyAccessTokenMiddleware, getQuotaInfo);
 
 // GET /api/inference/history - 유저의 AI 추론 이력 조회
 inferenceRouter.get(
@@ -46,6 +54,7 @@ inferenceRouter.post(
   "/snapback",
   verifyAccessTokenMiddleware,
   validateMiddleware({ body: snapbackInferenceBodySchema }),
+  checkInferenceQuota,
   postSnapbackInference
 );
 
@@ -54,6 +63,7 @@ inferenceRouter.post(
   "/quant-signal",
   verifyAccessTokenMiddleware,
   validateMiddleware({ body: quantSignalInferenceBodySchema }),
+  checkAndIncrementQuota,
   postQuantSignalInference
 );
 
