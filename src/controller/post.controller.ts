@@ -86,9 +86,9 @@ export const getPost = async (
         post_likes:
           currentUserId !== undefined
             ? {
-                where: { user_id: currentUserId as number },
-                take: 1, // 존재 여부만 확인하면 되므로 1개만 가져옴
-              }
+              where: { user_id: currentUserId as number },
+              take: 1, // 존재 여부만 확인하면 되므로 1개만 가져옴
+            }
             : false,
       },
     });
@@ -196,7 +196,6 @@ export const createPost = async (
 
       const postId = newPost.id.toString();
       const urlMap: Record<string, string> = {}; // blob URL -> 새 URL 매핑
-
       // 2. blob URL에 해당하는 파일들을 Firebase Storage에 업로드
       for (const blobUrl of imageUrls) {
         // blob URL이 아닌 경우 (이미 Firebase Storage URL 등) 건너뛰기
@@ -950,8 +949,8 @@ export const getMyLikedPostList = async (
     const bufferCounts: (string | null)[] =
       redisKeys.length > 0
         ? await redis
-            .mget(...redisKeys)
-            .catch(() => new Array(redisKeys.length).fill(null))
+          .mget(...redisKeys)
+          .catch(() => new Array(redisKeys.length).fill(null))
         : [];
 
     // 6단계: 최종 응답 매핑 (isLiked는 항상 true)
