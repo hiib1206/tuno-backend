@@ -10,6 +10,7 @@ import {
   sendEmailVerification,
   uploadProfileImage,
   verifyEmail,
+  withdrawUser,
 } from "../controller/user.controller";
 import { verifyAccessTokenMiddleware } from "../middleware/auth.middleware";
 import { uploadProfileImageMiddleware } from "../middleware/multer.middleware";
@@ -71,5 +72,8 @@ userRouter.post(
   validateMiddleware({ body: userEmailVerificationSchema }),
   resendEmailVerification
 );
+
+// DELETE api/user/me - 회원탈퇴
+userRouter.delete("/me", verifyAccessTokenMiddleware, withdrawUser);
 
 export default userRouter;

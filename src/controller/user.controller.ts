@@ -10,7 +10,7 @@ import {
   generateVerificationCode,
   sendVerificationEmail,
 } from "../utils/email";
-import { UserPayload } from "../utils/token";
+import { deleteAllRefreshTokens, UserPayload } from "../utils/token";
 import { toUserResponse } from "../utils/user";
 
 // me
@@ -483,6 +483,37 @@ export const getUserCommunityStats = async (
         likeCount,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 회원탈퇴
+export const withdrawUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userId } = req.user as UserPayload;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.is_active === "N") {
+      return sendError(res, 404, "사용자를 찾을 수 없습니다.");
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { is_active: "N" },
+    });
+
+    // 강제 로그아웃
+    await deleteAllRefreshTokens(userId);
+
+    return sendSuccess(res, 200, "회원탈퇴가 완료되었습니다.");
   } catch (error) {
     next(error);
   }
