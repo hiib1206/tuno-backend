@@ -11,11 +11,16 @@ import { generateOAuthState, verifyOAuthState } from "../utils/auth";
 import { sendError, sendSuccess } from "../utils/commonResponse";
 import {
   generateVerificationCode,
+  maskUsername,
+  sendFindUsernameEmail,
+  sendPasswordResetEmail,
   sendVerificationEmail,
 } from "../utils/email";
+import { generateNick } from "../utils/nick";
 import { getClientIp, getDeviceId, getUserAgent } from "../utils/request";
 import {
   clearRefreshTokenCookie,
+  deleteAllRefreshTokens,
   deleteRefreshToken,
   generateAccessToken,
   generateRefreshToken,
@@ -24,7 +29,6 @@ import {
   setRefreshTokenCookie,
   UserPayload,
 } from "../utils/token";
-import { generateNick } from "../utils/nick";
 import { toUserResponse } from "../utils/user";
 
 // UUID 형식 검증 (모든 UUID 버전 지원)
@@ -911,5 +915,100 @@ export const kakaoCallback = async (
   } catch (error) {
     // 실패 시 프론트엔드로 리다이렉트
     return res.redirect(`${env.FRONTEND_URL}/login?error=kakao_login_failed`);
+  }
+};
+
+// 아이디 찾기
+export const findUsername = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { email } = req.validated?.body;
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { username: true },
+    });
+
+    if (user && user.username) {
+      const masked = maskUsername(user.username);
+      await sendFindUsernameEmail(email, masked);
+    }
+
+    return sendSuccess(res, 200, "이메일이 발송되었습니다.");
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 비밀번호 재설정 요청
+export const requestPasswordReset = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { username, email } = req.validated?.body;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        username,
+        email,
+      },
+      select: { id: true },
+    });
+
+    if (user) {
+      const resetToken = crypto.randomUUID();
+
+      const redisKey = `password_reset:${resetToken}`;
+      const resetData = { userId: user.id };
+      await redis.set(redisKey, JSON.stringify(resetData), "EX", 300);
+
+      await sendPasswordResetEmail(email, resetToken);
+    }
+
+    // 보안으로 사용자가 존재하지 않는 경우에도 응답
+    return sendSuccess(res, 200, "이메일이 발송되었습니다.");
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 비밀번호 재설정
+export const resetPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { token, newPw } = req.validated?.body;
+
+    const redisKey = `password_reset:${token}`;
+    const resetDataString = await redis.get(redisKey);
+
+    if (!resetDataString) {
+      return sendError(res, 400, "유효하지 않거나 만료된 토큰입니다.");
+    }
+
+    const resetData = JSON.parse(resetDataString);
+    const userId = resetData.userId;
+
+    const hashedPw = await bcrypt.hash(newPw, 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { pw: hashedPw },
+    });
+
+    await redis.del(redisKey);
+
+    await deleteAllRefreshTokens(userId);
+
+    return sendSuccess(res, 200, "비밀번호가 성공적으로 변경되었습니다.");
+  } catch (error) {
+    next(error);
   }
 };

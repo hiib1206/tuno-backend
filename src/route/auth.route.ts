@@ -2,6 +2,7 @@ import { Router } from "express";
 import { env } from "../config/env";
 import passport from "../config/passport";
 import {
+  findUsername,
   google,
   googleCallback,
   kakao,
@@ -12,7 +13,9 @@ import {
   naverCallback,
   refresh,
   register,
+  requestPasswordReset,
   resendEmailVerification,
+  resetPassword,
   sendEmailVerification,
   verifyEmail,
 } from "../controller/auth.controller";
@@ -20,6 +23,9 @@ import { verifyRefreshTokenMiddleware } from "../middleware/auth.middleware";
 import { validateMiddleware } from "../middleware/validation.middleware";
 import {
   emailVerificationSchema,
+  findUsernameSchema,
+  passwordResetRequestSchema,
+  passwordResetSchema,
   registerSchema,
   verifyEmailSchema,
 } from "../schema/auth.schema";
@@ -92,6 +98,25 @@ authRouter.get(
     failureRedirect: `${env.FRONTEND_URL}/login?error=kakao_login_failed`,
   }),
   kakaoCallback
+);
+
+// POST api/auth/find-username - 아이디 찾기
+authRouter.post(
+  "/find-username",
+  validateMiddleware({ body: findUsernameSchema }),
+  findUsername
+);
+// POST api/auth/password/reset-request - 비밀번호 재설정 요청
+authRouter.post(
+  "/password/reset-request",
+  validateMiddleware({ body: passwordResetRequestSchema }),
+  requestPasswordReset
+);
+// POST api/auth/password/reset - 비밀번호 재설정
+authRouter.post(
+  "/password/reset",
+  validateMiddleware({ body: passwordResetSchema }),
+  resetPassword
 );
 
 export default authRouter;
