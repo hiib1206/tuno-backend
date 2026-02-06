@@ -405,7 +405,7 @@ export const changePassword = async (
 ) => {
   try {
     const { userId } = req.user as UserPayload;
-    const { oldPw, newPw } = req.body;
+    const { oldPw, newPw } = req.validated?.body;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -425,7 +425,11 @@ export const changePassword = async (
 
     const isPasswordValid = await bcrypt.compare(oldPw, user.pw);
     if (!isPasswordValid) {
-      return sendError(res, 400, "비밀번호가 일치하지 않습니다.");
+      return sendError(res, 400, "현재 비밀번호가 일치하지 않습니다.");
+    }
+
+    if (oldPw === newPw) {
+      return sendError(res, 400, "새 비밀번호가 현재 비밀번호와 같습니다.");
     }
 
     const hashedNewPw = await bcrypt.hash(newPw, 10);
@@ -433,6 +437,9 @@ export const changePassword = async (
       where: { id: userId },
       data: { pw: hashedNewPw },
     });
+
+    // 모든 세션 무효화 (다른 기기 로그아웃)
+    await deleteAllRefreshTokens(userId);
 
     return sendSuccess(res, 200, "비밀번호가 변경되었습니다.");
   } catch (error) {
