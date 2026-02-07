@@ -513,12 +513,7 @@ export const withdrawUser = async (
       where: { id: userId },
       data: {
         deleted_at: now,
-        // email suffix 추가 (재가입 허용)
         email: user.email ? `${user.email}_${now.getTime()}_deleted` : null,
-        // username, nick도 재사용 허용
-        username: user.username
-          ? `${user.username}_${now.getTime()}_deleted`
-          : null,
         nick: `${user.nick}_${now.getTime()}_deleted`,
       },
     });

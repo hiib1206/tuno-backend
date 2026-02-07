@@ -80,7 +80,7 @@ const validRoles = new Set<string>(Object.values(user_role));
 /**
  * userId로 사용자 role을 조회합니다.
  * Redis 캐시(5분)를 우선 사용하고, 캐시 미스 시 DB에서 조회 후 캐시합니다.
- * is_active가 'Y'가 아닌 경우 null을 반환합니다.
+ * 탈퇴한 사용자(deleted_at이 있는 경우)는 null을 반환합니다.
  */
 export const getUserRole = async (
   userId: number
@@ -94,10 +94,10 @@ export const getUserRole = async (
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { role: true, is_active: true },
+    select: { role: true, deleted_at: true },
   });
 
-  if (!user || user.is_active !== "Y") {
+  if (!user || user.deleted_at) {
     return null;
   }
 

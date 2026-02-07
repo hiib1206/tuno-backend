@@ -75,7 +75,7 @@ export const getPostListService = async (
           'email_verified_at', u.email_verified_at,
           'profile_image_url', u.profile_image_url,
           'profile_image_updated_at', u.profile_image_updated_at,
-          'is_active', u.is_active,
+          'deleted_at', u.deleted_at,
           'created_at', u.created_at,
           'updated_at', u.updated_at
         ) as author

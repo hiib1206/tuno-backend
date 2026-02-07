@@ -25,7 +25,7 @@ model user {
   role                     user_role  @default(FREE)
   profile_image_url        String?     @db.VarChar(255)
   profile_image_updated_at DateTime?
-  is_active                user_is_active @default(Y)
+  deleted_at               DateTime?  // null이면 활성, 값이 있으면 탈퇴
 
   created_at               DateTime   @default(now())
   updated_at               DateTime   @updatedAt
@@ -41,7 +41,7 @@ model user {
   ai_inference_histories   ai_inference_history[]
   stock_comments           stock_comment[]
 
-  @@index([is_active], map: "User_is_active_idx")
+  @@index([deleted_at], map: "User_deleted_at_idx")
 }
 
 model auth_provider {
@@ -64,11 +64,6 @@ enum user_role {
   FREE
   PRO
   ADMIN
-}
-
-enum user_is_active {
-  Y
-  N
 }
 
 // 카테고리 (post_category) - Enum 형식
