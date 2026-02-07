@@ -16,6 +16,7 @@ import { verifyAccessTokenMiddleware } from "../middleware/auth.middleware";
 import { uploadProfileImageMiddleware } from "../middleware/multer.middleware";
 import { validateMiddleware } from "../middleware/validation.middleware";
 import {
+  changeNicknameSchema,
   changePasswordSchema,
   userEmailVerificationSchema,
   verifyUserEmailSchema,
@@ -30,7 +31,12 @@ userRouter.get("/username", checkUsername);
 // get api/user/nickname
 userRouter.get("/nickname", checkNickname);
 // patch api/user/nickname
-userRouter.patch("/nickname", verifyAccessTokenMiddleware, changeNickname);
+userRouter.patch(
+  "/nickname",
+  verifyAccessTokenMiddleware,
+  validateMiddleware({ body: changeNicknameSchema }),
+  changeNickname
+);
 // post api/user/profile-image
 userRouter.post(
   "/profile-image",

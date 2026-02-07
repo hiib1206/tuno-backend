@@ -26,3 +26,10 @@ export const verifyUserEmailSchema = z.object({
 // 타입 생성
 export type VerifyUserEmailSchema = z.infer<typeof verifyUserEmailSchema>;
 
+// 닉네임 변경
+export const changeNicknameSchema = z.object({
+  nick: z
+    .string()
+    .min(2, "닉네임은 최소 2자 이상이어야 합니다.")
+    .max(20, "닉네임은 최대 20자까지 가능합니다."),
+});

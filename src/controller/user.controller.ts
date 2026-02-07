@@ -22,7 +22,7 @@ export const me = async (req: Request, res: Response, next: NextFunction) => {
       include: { auth_providers: true },
     });
 
-    if (!user || !user?.is_active) {
+    if (!user || user.deleted_at) {
       return sendError(res, 401, "사용자를 찾을 수 없습니다.");
     }
 
@@ -95,11 +95,7 @@ export const changeNickname = async (
 ) => {
   try {
     const { userId } = req.user as UserPayload;
-    const { nick } = req.body;
-
-    if (!nick) {
-      return sendError(res, 400, "닉네임을 입력해주세요.");
-    }
+    const { nick } = req.validated?.body;
 
     const existingNick = await prisma.user.findUnique({
       where: { nick: nick as string },
@@ -411,7 +407,7 @@ export const changePassword = async (
       where: { id: userId },
     });
 
-    if (!user || !user?.is_active) {
+    if (!user || user.deleted_at) {
       return sendError(res, 400, "사용자를 찾을 수 없습니다.");
     }
 
@@ -508,13 +504,23 @@ export const withdrawUser = async (
       where: { id: userId },
     });
 
-    if (!user || user.is_active === "N") {
+    if (!user || user.deleted_at) {
       return sendError(res, 404, "사용자를 찾을 수 없습니다.");
     }
 
+    const now = new Date();
     await prisma.user.update({
       where: { id: userId },
-      data: { is_active: "N" },
+      data: {
+        deleted_at: now,
+        // email suffix 추가 (재가입 허용)
+        email: user.email ? `${user.email}_${now.getTime()}_deleted` : null,
+        // username, nick도 재사용 허용
+        username: user.username
+          ? `${user.username}_${now.getTime()}_deleted`
+          : null,
+        nick: `${user.nick}_${now.getTime()}_deleted`,
+      },
     });
 
     // 강제 로그아웃
