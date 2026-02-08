@@ -8,7 +8,7 @@ dotenv.config();
 const envSchema = z.object({
   // 여기에 검증 할거 추가.
   NODE_ENV: z.enum(["development", "production", "test"]),
-  PORT: z.coerce.number().min(1000).max(65535),
+  BACKEND_PORT: z.coerce.number().min(1000).max(65535),
   FRONTEND_URL: z.string().min(1),
 
   // tuno-ai-api-server

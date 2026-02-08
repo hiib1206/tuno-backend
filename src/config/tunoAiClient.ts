@@ -5,7 +5,7 @@ import { env } from "./env";
 
 export const tunoAiClient = axios.create({
   baseURL: env.TUNO_AI_API_BASE_URL,
-  timeout: 5000,
+  timeout: 60000, // 60초
   headers: {
     "x-internal-secret-key": env.TUNO_AI_API_SECRET_KEY,
   },

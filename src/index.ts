@@ -8,10 +8,10 @@ import { initSSESubscriber } from "./service/sse.service";
 
 const server = http.createServer(app);
 
-server.listen(env.PORT, async () => {
+server.listen(env.BACKEND_PORT, async () => {
   // Prisma 연결 초기화
   await prisma.$connect();
-  console.log(`Server is running on port ${env.PORT}`);
+  console.log(`Server is running on port ${env.BACKEND_PORT}`);
 
   // SSE Redis Pub/Sub 구독 시작
   await initSSESubscriber();
