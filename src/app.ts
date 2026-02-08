@@ -26,7 +26,6 @@ app.use(
       "http://127.0.0.1:3000",
       "http://localhost:3000",
       "http://localhost:3001",
-      "http://59.25.224.32:3000",
     ],
     credentials: true,
     exposedHeaders: ["X-Quota-Limit", "X-Quota-Used", "X-Quota-Remaining", "X-Quota-Reset"],
@@ -39,6 +38,11 @@ app.use(cookieParser());
 app.use(passport.initialize());
 // 커스텀 미들웨어들
 app.use(optionalDeviceIdMiddleware); // 전역: x-device-id 선택적 검증 (있으면 형식만 검증)
+
+// Health check
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
 // Routes
 app.use("/api/test", testRouter);

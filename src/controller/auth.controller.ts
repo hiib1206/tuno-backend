@@ -347,7 +347,7 @@ export const login = async (
       return sendError(res, 400, "아이디와 비밀번호를 입력해주세요.");
     }
     const user = await prisma.user.findUnique({
-      where: { username },
+      where: { username, deleted_at: null },
     });
 
     if (!user) {
@@ -570,10 +570,17 @@ export const googleCallback = async (
     });
     let user = authProvider?.user ?? null;
 
+    // 탈퇴한 사용자는 로그인 불가
+    if (user?.deleted_at) {
+      return res.redirect(
+        `${env.FRONTEND_URL}/login?error=google_login_failed${redirectParam}`
+      );
+    }
+
     // 2단계: email로 조회 (일반 회원가입 사용자와 통합)
     if (!user && email) {
       user = await prisma.user.findUnique({
-        where: { email },
+        where: { email, deleted_at: null },
       });
 
       if (user) {
@@ -732,6 +739,13 @@ export const naverCallback = async (
     });
     let user = authProvider?.user ?? null;
 
+    // 탈퇴한 사용자는 로그인 불가
+    if (user?.deleted_at) {
+      return res.redirect(
+        `${env.FRONTEND_URL}/login?error=naver_login_failed${redirectParam}`
+      );
+    }
+
     // 2단계: 신규 사용자 생성 (nick 충돌 시 재시도)
     // Naver는 email 기반 통합을 하지 않음 (email이 연락처용이므로 신뢰 불가)
     if (!user) {
@@ -868,6 +882,13 @@ export const kakaoCallback = async (
     });
     let user = authProvider?.user ?? null;
 
+    // 탈퇴한 사용자는 로그인 불가
+    if (user?.deleted_at) {
+      return res.redirect(
+        `${env.FRONTEND_URL}/login?error=kakao_login_failed${redirectParam}`
+      );
+    }
+
     // 2단계: 신규 사용자 생성 (nick 충돌 시 재시도)
     // Kakao는 email 기반 통합을 하지 않음 (email이 신뢰할 수 없을 수 있음)
     if (!user) {
@@ -928,7 +949,7 @@ export const findUsername = async (
     const { email } = req.validated?.body;
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email, deleted_at: null },
       select: { username: true },
     });
 
@@ -956,6 +977,7 @@ export const requestPasswordReset = async (
       where: {
         username,
         email,
+        deleted_at: null,
       },
       select: { id: true },
     });
