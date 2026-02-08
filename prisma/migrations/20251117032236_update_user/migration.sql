@@ -12,4 +12,4 @@ ALTER TABLE `user` ADD COLUMN `username` VARCHAR(255) NOT NULL,
     MODIFY `address` VARCHAR(400) NULL;
 
 -- CreateIndex
-CREATE UNIQUE INDEX `User_username_key` ON `User`(`username`);
+CREATE UNIQUE INDEX `User_username_key` ON `user`(`username`);

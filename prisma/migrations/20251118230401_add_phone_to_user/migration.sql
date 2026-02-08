@@ -8,4 +8,4 @@
 ALTER TABLE `user` ADD COLUMN `phone` VARCHAR(30) NULL;
 
 -- CreateIndex
-CREATE UNIQUE INDEX `User_phone_key` ON `User`(`phone`);
+CREATE UNIQUE INDEX `User_phone_key` ON `user`(`phone`);
