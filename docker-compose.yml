@@ -1,0 +1,12 @@
+services:
+  backend:
+    image: tuno-backend
+    build: .
+    container_name: tuno-backend
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env.docker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+

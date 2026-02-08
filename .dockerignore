@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Prisma generated (Windows binaries)
+src/generated/
+
+# Git
+.git/
+.gitignore
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE/Editor
+.vscode/
+.cursor/
+.cursorignore
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test & dummy data
+dummy/
+test/
+tests/
+*.test.ts
+*.spec.ts
+coverage/
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Misc
+.eslintrc*
+.prettierrc*
+*.config.js
+!prisma.config.ts
