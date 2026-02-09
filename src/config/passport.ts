@@ -10,7 +10,7 @@ passport.use(
     {
       clientID: env.GOOGLE_CLIENT_ID,
       clientSecret: env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:4000/api/auth/google/callback",
+      callbackURL: `${env.BACKEND_URL}/api/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
       // profile 정보를 done 콜백으로 전달
@@ -26,7 +26,7 @@ passport.use(
     {
       clientID: env.NAVER_CLIENT_ID,
       clientSecret: env.NAVER_CLIENT_SECRET,
-      callbackURL: "http://localhost:4000/api/auth/naver/callback",
+      callbackURL: `${env.BACKEND_URL}/api/auth/naver/callback`,
     },
     async (
       accessToken: string,
@@ -47,7 +47,7 @@ passport.use(
     {
       clientID: env.KAKAO_CLIENT_ID,
       clientSecret: env.KAKAO_CLIENT_SECRET,
-      callbackURL: "http://localhost:4000/api/auth/kakao/callback",
+      callbackURL: `${env.BACKEND_URL}/api/auth/kakao/callback`,
     },
     async (
       accessToken: string,

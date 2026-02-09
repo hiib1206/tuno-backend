@@ -9,6 +9,7 @@ const envSchema = z.object({
   // 여기에 검증 할거 추가.
   NODE_ENV: z.enum(["development", "production", "test"]),
   BACKEND_PORT: z.coerce.number().min(1000).max(65535),
+  BACKEND_URL: z.string().url(),
   FRONTEND_URL: z.string().min(1),
 
   // tuno-ai-api-server
