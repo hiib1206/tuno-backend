@@ -95,8 +95,9 @@ export const lsRequest = async <T>(
   } catch (error) {
     // 토큰 에러 시 갱신 후 재시도
     if (retryOnTokenError && axios.isAxiosError(error)) {
-      if (error.response?.status === 401) {
-        logger.warn("LS token error (401), refreshing");
+      const rspCd = (error.response?.data as { rsp_cd?: string })?.rsp_cd;
+      if (error.response?.status === 401 || rspCd === "IGW00121") {
+        logger.warn(`LS token error (${error.response?.status}, ${rspCd}), refreshing`);
         await forceRefreshToken();
         return lsRequest<T>(options, false);
       }
