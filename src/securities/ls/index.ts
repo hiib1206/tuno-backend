@@ -1,4 +1,3 @@
-// Types
 export type {
   LSCachedToken,
   LSContinuation,
@@ -8,7 +7,6 @@ export type {
   LSTokenResponse
 } from "./commonTypes";
 
-// Constants
 export {
   API_PATH,
   HTTP_CONFIG,
@@ -17,13 +15,10 @@ export {
   TOKEN_CONFIG
 } from "./constants";
 
-// Errors
-export { handleLSError, LSError, LSTokenError } from "./errors";
+export { LSError, LSTokenError, wrapLSError } from "./errors";
 
-// Token
 export { clearCachedToken, forceRefreshToken, getValidToken } from "./token";
 
-// Client
 export {
   lsRequest,
   lsRequestAllPages,

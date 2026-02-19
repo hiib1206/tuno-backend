@@ -1,9 +1,6 @@
 import { lsRequest } from "../client";
 import { API_PATH } from "../constants";
 
-// ===== 타입 정의 =====
-
-// 요청
 export type T1537InBlock = {
   tmcode: string; // 테마코드 (t8425에서 조회)
 };
@@ -12,7 +9,6 @@ export type T1537Request = {
   t1537InBlock: T1537InBlock;
 };
 
-// 응답
 export type T1537OutBlock = {
   upcnt: number; // 상승종목수
   tmcnt: number; // 테마종목수
@@ -44,16 +40,12 @@ export type T1537Response = {
   t1537OutBlock1: T1537OutBlock1Item[];
 };
 
-// ===== API 함수 =====
-
 export type GetThemeStocksResult = {
   info: T1537OutBlock;
   stocks: T1537OutBlock1Item[];
 };
 
-/**
- * 테마종목별 시세조회 (t1537)
- */
+/** 테마 종목별 시세를 조회한다 (t1537). */
 export const getThemeStocks = async (
   tmcode: string
 ): Promise<GetThemeStocksResult> => {

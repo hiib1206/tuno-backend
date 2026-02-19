@@ -4,7 +4,6 @@ import { Strategy as KakaoStrategy } from "passport-kakao";
 import { Strategy as NaverStrategy } from "passport-naver-v2";
 import { env } from "./env";
 
-// Google OAuth 전략 설정
 passport.use(
   new GoogleStrategy(
     {
@@ -13,14 +12,11 @@ passport.use(
       callbackURL: `${env.BACKEND_URL}/api/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
-      // profile 정보를 done 콜백으로 전달
-      // 실제 사용자 생성/조회는 컨트롤러에서 처리
       return done(null, profile);
     }
   )
 );
 
-// Naver OAuth 전략 설정
 passport.use(
   new NaverStrategy(
     {
@@ -34,14 +30,11 @@ passport.use(
       profile: Profile,
       done: (err: any, user: any) => void
     ) => {
-      // profile 정보를 done 콜백으로 전달
-      // 실제 사용자 생성/조회는 컨트롤러에서 처리
       return done(null, profile);
     }
   )
 );
 
-// Kakao OAuth 전략 설정
 passport.use(
   new KakaoStrategy(
     {
@@ -55,14 +48,12 @@ passport.use(
       profile: Profile,
       done: (err: any, user: any) => void
     ) => {
-      // profile 정보를 done 콜백으로 전달
-      // 실제 사용자 생성/조회는 컨트롤러에서 처리
       return done(null, profile);
     }
   ) as any
 );
 
-// 세션을 사용하지 않으므로 serialize/deserialize는 간단하게 처리
+// JWT 기반 인증을 사용하므로 세션 직렬화는 단순 통과 처리한다.
 passport.serializeUser((user: any, done) => {
   done(null, user);
 });

@@ -4,21 +4,20 @@ import express from "express";
 import passport from "./config/passport";
 import { optionalDeviceIdMiddleware } from "./middleware/deviceId.middleware";
 import { errorHandler } from "./middleware/error.middleware";
+import { NotFoundError } from "./shared/errors/AppError";
 import morganMiddleware from "./middleware/morgan.middleware";
-import authRouter from "./route/auth.route";
-import inferenceRouter from "./route/inference.route";
-import newsRouter from "./route/news.route";
-import notificationRouter from "./route/notification.route";
-import postCommentRouter from "./route/post-comment.route";
-import postRouter from "./route/post.route";
-import stockCommentRouter from "./route/stock-comment.route";
-import stockRouter from "./route/stock.route";
-import testRouter from "./route/test.route";
-import themeRouter from "./route/theme.route";
-import userRouter from "./route/user.route";
+import authRouter from "./modules/auth/auth.routes";
+import inferenceRouter from "./modules/inference/inference.routes";
+import newsRouter from "./modules/news/news.routes";
+import notificationRouter from "./modules/notification/notification.routes";
+import postCommentRouter from "./modules/post-comment/post-comment.routes";
+import postRouter from "./modules/post/post.routes";
+import stockCommentRouter from "./modules/stock-comment/stock-comment.routes";
+import stockRouter from "./modules/stock/stock.routes";
+import themeRouter from "./modules/theme/theme.routes";
+import userRouter from "./modules/user/user.routes";
 const app = express();
 
-// Middleware
 app.use(morganMiddleware);
 app.use(
   cors({
@@ -35,18 +34,13 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-// Passport 초기화
 app.use(passport.initialize());
-// 커스텀 미들웨어들
-app.use(optionalDeviceIdMiddleware); // 전역: x-device-id 선택적 검증 (있으면 형식만 검증)
+app.use(optionalDeviceIdMiddleware);
 
-// Health check
 app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-// Routes
-app.use("/api/test", testRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/user", userRouter);
 app.use("/api/post", postRouter);
@@ -58,7 +52,10 @@ app.use("/api/theme", themeRouter);
 app.use("/api/inference", inferenceRouter);
 app.use("/api/notification", notificationRouter);
 
-// Error Handling
+app.use((_req, _res, next) => {
+  next(new NotFoundError("요청한 리소스를 찾을 수 없습니다."));
+});
+
 app.use(errorHandler);
 
 export default app;

@@ -1,16 +1,19 @@
 import { NextFunction, Request, Response } from "express";
 import redis from "../config/redis";
-import { sendError } from "../utils/commonResponse";
+import {
+  TooManyRequestsError,
+  UnauthorizedError,
+} from "../shared/errors/AppError";
 import {
   DAILY_INFERENCE_LIMIT,
   getQuotaRedisKey,
   getQuotaResetTimestamp,
   getUserRole,
-} from "../utils/role";
-import { UserPayload } from "../utils/token";
+} from "../shared/utils/role";
+import { UserPayload } from "../shared/utils/token";
 
 /**
- * 다음 날 KST 자정까지 남은 초 계산
+ * 다음 날 KST 자정까지 남은 초를 계산한다.
  */
 const getTTLUntilMidnightKST = (): number => {
   const nowKST = Date.now() + 9 * 60 * 60 * 1000;
@@ -21,10 +24,11 @@ const getTTLUntilMidnightKST = (): number => {
 };
 
 /**
- * Redis Lua 스크립트: 원자적 check-and-increment
- * - 현재 값이 limit 이상이면 -1 반환 (초과)
- * - 아니면 INCR 후 새 값 반환
- * - 첫 사용 시 TTL 설정
+ * 원자적 check-and-increment를 수행하는 Redis Lua 스크립트.
+ *
+ * @remarks
+ * 현재 값이 limit 이상이면 -1을 반환하고, 그 외에는 INCR 후 새 값을 반환한다.
+ * 첫 사용 시 TTL을 설정한다.
  */
 const LUA_CHECK_AND_INCR = `
 local current = tonumber(redis.call('GET', KEYS[1]) or '0')
@@ -39,19 +43,19 @@ return newVal
 `;
 
 /**
- * 공통: 사용자 역할과 한도 정보 조회
+ * 사용자 역할과 한도 정보를 조회한다.
+ *
+ * @throws {@link UnauthorizedError} 인증 정보가 없거나 사용자를 찾을 수 없는 경우
  */
-const getRoleAndLimit = async (req: Request, res: Response) => {
+const getRoleAndLimit = async (req: Request) => {
   const userId = (req.user as UserPayload)?.userId;
   if (!userId) {
-    sendError(res, 401, "인증 정보가 존재하지 않습니다.");
-    return null;
+    throw new UnauthorizedError("인증 정보가 존재하지 않습니다.");
   }
 
   const role = req.userRole ?? (await getUserRole(userId));
   if (!role) {
-    sendError(res, 401, "사용자를 찾을 수 없습니다.");
-    return null;
+    throw new UnauthorizedError("사용자를 찾을 수 없습니다.");
   }
 
   if (!req.userRole) {
@@ -62,8 +66,14 @@ const getRoleAndLimit = async (req: Request, res: Response) => {
 };
 
 /**
- * Snapback용: 쿼터 체크만 (INCR 안 함)
- * 실제 카운트 증가는 컨트롤러에서 성공 시에만 수행
+ * AI 추론 쿼터를 체크하는 미들웨어.
+ *
+ * @remarks
+ * 카운트를 증가시키지 않고 체크만 수행한다.
+ * 실제 카운트 증가는 컨트롤러에서 성공 시에만 수행한다. (Snapback용)
+ *
+ * @throws {@link UnauthorizedError} 인증 정보가 없거나 사용자를 찾을 수 없는 경우
+ * @throws {@link TooManyRequestsError} 일일 한도를 초과한 경우
  */
 export const checkInferenceQuota = async (
   req: Request,
@@ -71,14 +81,10 @@ export const checkInferenceQuota = async (
   next: NextFunction
 ) => {
   try {
-    const info = await getRoleAndLimit(req, res);
-    if (!info) return;
-
-    const { userId, role, limit } = info;
+    const { userId, role, limit } = await getRoleAndLimit(req);
 
     const resetTimestamp = getQuotaResetTimestamp();
 
-    // 무제한 (ADMIN)
     if (limit === 0) {
       res.setHeader("X-Quota-Limit", "unlimited");
       res.setHeader("X-Quota-Remaining", "unlimited");
@@ -95,15 +101,12 @@ export const checkInferenceQuota = async (
       res.setHeader("X-Quota-Remaining", "0");
       res.setHeader("X-Quota-Reset", resetTimestamp.toString());
 
-      return sendError(
-        res,
-        429,
+      throw new TooManyRequestsError(
         `일일 AI 추론 한도를 초과했습니다. (${role} 등급: ${limit}회/일)`,
         { role, limit, used: currentUsage, remaining: 0 }
       );
     }
 
-    // 체크만 통과 (아직 INCR 안 함)
     res.setHeader("X-Quota-Limit", limit.toString());
     res.setHeader("X-Quota-Used", currentUsage.toString());
     res.setHeader("X-Quota-Remaining", (limit - currentUsage).toString());
@@ -116,8 +119,14 @@ export const checkInferenceQuota = async (
 };
 
 /**
- * Quant-signal용: 쿼터 체크 + 원자적 INCR
- * 비동기 추론이므로 요청 시점에 카운트 (실패 시 환불)
+ * AI 추론 쿼터를 체크하고 원자적으로 카운트를 증가시키는 미들웨어.
+ *
+ * @remarks
+ * 비동기 추론이므로 요청 시점에 카운트를 증가시킨다. (Quant-signal용)
+ * 추론 실패 시 환불 처리가 필요하다.
+ *
+ * @throws {@link UnauthorizedError} 인증 정보가 없거나 사용자를 찾을 수 없는 경우
+ * @throws {@link TooManyRequestsError} 일일 한도를 초과한 경우
  */
 export const checkAndIncrementQuota = async (
   req: Request,
@@ -125,13 +134,9 @@ export const checkAndIncrementQuota = async (
   next: NextFunction
 ) => {
   try {
-    const info = await getRoleAndLimit(req, res);
-    if (!info) return;
-
-    const { userId, role, limit } = info;
+    const { userId, role, limit } = await getRoleAndLimit(req);
     const resetTimestamp = getQuotaResetTimestamp();
 
-    // 무제한 (ADMIN)
     if (limit === 0) {
       res.setHeader("X-Quota-Limit", "unlimited");
       res.setHeader("X-Quota-Remaining", "unlimited");
@@ -142,7 +147,6 @@ export const checkAndIncrementQuota = async (
     const redisKey = getQuotaRedisKey(userId);
     const ttl = getTTLUntilMidnightKST();
 
-    // 원자적 check-and-increment
     const result = (await redis.eval(
       LUA_CHECK_AND_INCR,
       1,
@@ -159,9 +163,7 @@ export const checkAndIncrementQuota = async (
       res.setHeader("X-Quota-Remaining", "0");
       res.setHeader("X-Quota-Reset", resetTimestamp.toString());
 
-      return sendError(
-        res,
-        429,
+      throw new TooManyRequestsError(
         `일일 AI 추론 한도를 초과했습니다. (${role} 등급: ${limit}회/일)`,
         { role, limit, used: currentUsage, remaining: 0 }
       );

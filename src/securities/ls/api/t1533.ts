@@ -1,9 +1,6 @@
 import { lsRequest } from "../client";
 import { API_PATH } from "../constants";
 
-// ===== 타입 정의 =====
-
-// 요청
 export type T1533Gubun =
   | "1" // 상승율 상위
   | "2" // 하락율 상위
@@ -23,7 +20,6 @@ export type T1533Request = {
   t1533InBlock: T1533InBlock;
 };
 
-// 응답
 export type T1533OutBlock = {
   bdate: string; // 일자
 };
@@ -52,16 +48,12 @@ export type GetSpecialThemesResult = {
   themes: T1533OutBlock1Item[];
 };
 
-// ===== API 함수 =====
-
 export type GetSpecialThemesParams = {
   gubun: T1533Gubun;
-  chgdate?: number; // 기본값 0
+  chgdate?: number;
 };
 
-/**
- * 특이테마 조회 (t1533)
- */
+/** 특이 테마를 조회한다 (t1533). */
 export const getSpecialThemes = async (
   params: GetSpecialThemesParams
 ): Promise<GetSpecialThemesResult> => {

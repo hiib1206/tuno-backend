@@ -97,6 +97,7 @@ out/
 
 
 /src/generated/prisma
+/prisma/dbml
 
 # 개인 테스트 용
 /uploads
@@ -105,6 +106,7 @@ out/
 
 # AI 관련
 .cursorignore
+CLAUDE.md
 
 # kiwoom api
 /src/securities/kiwoom

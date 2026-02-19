@@ -1,22 +1,61 @@
-import { NextFunction, Request, Response } from "express";
+import type { ErrorRequestHandler } from "express";
+import { env } from "../config/env";
 import logger from "../config/logger";
-import { sendError } from "../utils/commonResponse";
+import { AppError } from "../shared/errors/AppError";
 
-// 에러 처리 미들웨어 (모든 라우트 이후에 위치)
-// sendError로 처리못해준 예상하지 못한 에러들을 단순히 500으로 응답
-export const errorHandler = (
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  if (err instanceof Error) {
-    logger.error("Error:", err);
-    logger.error("Error:", err.message);
-    logger.error("Stack:", err.stack);
-  } else {
-    logger.error("Error:", err);
+/**
+ * 중앙 에러 처리 미들웨어.
+ *
+ * @remarks
+ * 모든 라우트 이후에 위치해야 한다.
+ * - AppError: 해당 statusCode + message + data 반환
+ * - 그 외: 500 반환, 프로덕션에서는 메시지 숨김
+ */
+export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
+  // 이미 응답 전송이 시작된 경우 Express 기본 핸들러에 위임
+  if (res.headersSent) {
+    return next(err);
   }
 
-  sendError(res, 500, "Internal Server Error");
+  if (err instanceof AppError) {
+    logger.warn(err.message, {
+      statusCode: err.statusCode,
+      path: req.path,
+      method: req.method,
+    });
+
+    const body: Record<string, unknown> = {
+      success: false,
+      message: err.message,
+    };
+
+    // 프론트엔드 호환성을 위해 data 필드 유지
+    if (err.data) {
+      body.data = err.data;
+    }
+
+    return res.status(err.statusCode).json(body);
+  }
+
+  logger.error("Unexpected error", {
+    message: err instanceof Error ? err.message : "Unknown error",
+    stack: err instanceof Error ? err.stack : undefined,
+    path: req.path,
+    method: req.method,
+  });
+
+  return res.status(500).json({
+    success: false,
+    // 프로덕션: 내부 정보 노출 금지
+    message:
+      env.NODE_ENV === "production"
+        ? "Internal server error"
+        : err instanceof Error
+          ? err.message
+          : "Unknown error",
+    // 개발 환경에서만 stack trace 포함
+    ...(env.NODE_ENV !== "production" && {
+      stack: err instanceof Error ? err.stack : undefined,
+    }),
+  });
 };

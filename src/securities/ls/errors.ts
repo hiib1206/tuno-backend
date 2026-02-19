@@ -1,7 +1,6 @@
-import { Response } from "express";
-import { sendError } from "../../utils/commonResponse";
+import { ExternalApiError } from "../../shared/errors/AppError";
 
-// 기본 LS증권 에러
+/** LS증권 API 에러. */
 export class LSError extends Error {
   constructor(
     public readonly code: string,
@@ -13,7 +12,7 @@ export class LSError extends Error {
   }
 }
 
-// 토큰 관련 에러
+/** LS증권 토큰 관련 에러. */
 export class LSTokenError extends LSError {
   constructor(message: string) {
     super("TOKEN_ERROR", message);
@@ -22,44 +21,36 @@ export class LSTokenError extends LSError {
 }
 
 /**
- * LS증권 에러 처리 헬퍼
- * LSError인 경우 적절한 HTTP 응답 전송
- * @returns 에러 처리 완료 여부 (true면 next() 호출 불필요)
+ * LSError를 ExternalApiError로 변환하여 던진다.
+ *
+ * @remarks
+ * 서비스 레이어의 catch 블록에서 사용한다.
+ *
+ * @throws {@link ExternalApiError} 항상 던진다
  */
-export const handleLSError = (res: Response, error: unknown): boolean => {
+export const wrapLSError = (error: unknown): never => {
   if (!(error instanceof LSError)) {
-    return false;
+    throw error;
   }
 
   const code = error.code;
 
-  // HTTP 상태 코드 매핑
-  if (code === "400") {
-    sendError(res, 400, error.message);
-    return true;
-  }
-  if (code === "401") {
-    sendError(res, 401, error.message);
-    return true;
-  }
-  if (code === "404") {
-    sendError(res, 404, error.message);
-    return true;
-  }
-  if (code === "405") {
-    sendError(res, 405, error.message);
-    return true;
-  }
-  if (code === "500" || code === "503") {
-    sendError(res, 502, "LS증권 서버 오류");
-    return true;
-  }
-  if (code === "NETWORK") {
-    sendError(res, 502, "LS증권 서버 연결 실패");
-    return true;
-  }
+  const statusMap: Record<string, number> = {
+    "400": 400,
+    "401": 401,
+    "404": 404,
+    "405": 405,
+    "500": 502,
+    "503": 502,
+    NETWORK: 502,
+  };
 
-  // 기타 LSError
-  sendError(res, 500, error.message);
-  return true;
-}
+  const status = statusMap[code] ?? 500;
+  const message = ["500", "503", "NETWORK"].includes(code)
+    ? "LS증권 서버 오류"
+    : error.message;
+
+  throw new ExternalApiError("LS_SECURITIES", status, message, {
+    originalCode: code,
+  });
+};

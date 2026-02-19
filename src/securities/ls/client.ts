@@ -9,14 +9,18 @@ import { HTTP_CONFIG, LS_BASE_URL, TR_RATE_LIMIT_MS } from "./constants";
 import { LSError } from "./errors";
 import { forceRefreshToken, getValidToken } from "./token";
 
-// TR별 인메모리 rate limiter
 const trLastCallTime = new Map<string, number>();
 const trQueue = new Map<string, Promise<void>>();
 
+/**
+ * TR별 호출 간격을 보장한다.
+ *
+ * @remarks
+ * 이전 대기열이 끝날 때까지 기다린 뒤, 설정된 간격만큼 추가 대기한다.
+ */
 async function waitForRateLimit(trCode: string): Promise<void> {
   const intervalMs = TR_RATE_LIMIT_MS[trCode] ?? TR_RATE_LIMIT_MS.default;
 
-  // 이전 대기열이 끝날 때까지 기다린 뒤, 간격 보장
   const prev = trQueue.get(trCode) ?? Promise.resolve();
 
   let resolve: () => void;
@@ -36,7 +40,6 @@ async function waitForRateLimit(trCode: string): Promise<void> {
   resolve!();
 }
 
-// Axios 인스턴스
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: LS_BASE_URL,
   timeout: HTTP_CONFIG.DEFAULT_TIMEOUT,
@@ -45,22 +48,20 @@ const axiosInstance: AxiosInstance = axios.create({
   },
 });
 
-/**
- * 응답 헤더에서 연속조회 정보 추출
- */
+/** 응답 헤더에서 연속조회 정보를 추출한다. */
 const extractResponseHeaders = (
   headers: Record<string, unknown>
 ): LSResponseHeaders => {
   return {
-    // 연속 거래 여부
     trCont: (headers["tr_cont"] as "Y" | "N") || null,
-    // 연속 거래 키
     trContKey: (headers["tr_cont_key"] as string) || null,
   };
 };
 
 /**
- * LS증권 API 요청 (단건)
+ * LS증권 API 단건 요청을 수행한다.
+ *
+ * @throws {@link LSError} API 호출 실패 시
  */
 export const lsRequest = async <T>(
   options: LSRequestOptions,
@@ -68,7 +69,6 @@ export const lsRequest = async <T>(
 ): Promise<T> => {
   const { trCode, path, body, continuation, timeout } = options;
 
-  // TR별 호출 간격 보장
   await waitForRateLimit(trCode);
 
   try {
@@ -81,7 +81,6 @@ export const lsRequest = async <T>(
       tr_cont: continuation?.trCont || "N",
     };
 
-    // 연속조회 헤더 추가
     if (continuation?.trCont === "Y" && continuation?.trContKey) {
       headers["tr_cont_key"] = continuation.trContKey;
     }
@@ -93,7 +92,6 @@ export const lsRequest = async <T>(
 
     return response.data;
   } catch (error) {
-    // 토큰 에러 시 갱신 후 재시도
     if (retryOnTokenError && axios.isAxiosError(error)) {
       const rspCd = (error.response?.data as { rsp_cd?: string })?.rsp_cd;
       if (error.response?.status === 401 || rspCd === "IGW00121") {
@@ -103,7 +101,6 @@ export const lsRequest = async <T>(
       }
     }
 
-    // Axios 에러를 LSError로 래핑
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const data = error.response?.data as { rsp_msg?: string } | undefined;
@@ -119,7 +116,9 @@ export const lsRequest = async <T>(
 };
 
 /**
- * LS증권 API 요청 + 연속조회 정보 포함
+ * LS증권 API 요청을 수행하고 연속조회 정보를 포함하여 반환한다.
+ *
+ * @throws {@link LSError} API 호출 실패 시
  */
 export const lsRequestWithContinuation = async <T>(
   options: LSRequestOptions,
@@ -127,7 +126,6 @@ export const lsRequestWithContinuation = async <T>(
 ): Promise<{ data: T; headers: LSResponseHeaders }> => {
   const { trCode, path, body, continuation, timeout } = options;
 
-  // TR별 호출 간격 보장
   await waitForRateLimit(trCode);
 
   try {
@@ -163,7 +161,6 @@ export const lsRequestWithContinuation = async <T>(
       }
     }
 
-    // Axios 에러를 LSError로 래핑
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
       const data = error.response?.data as { rsp_msg?: string } | undefined;
@@ -179,7 +176,9 @@ export const lsRequestWithContinuation = async <T>(
 };
 
 /**
- * 연속조회 API 요청 (제너레이터)
+ * 연속조회 API 요청을 제너레이터로 수행한다.
+ *
+ * @throws {@link LSError} API 호출 실패 시
  */
 export async function* lsRequestPaginated<T>(
   options: Omit<LSRequestOptions, "continuation">
@@ -208,7 +207,10 @@ export async function* lsRequestPaginated<T>(
 }
 
 /**
- * 연속조회 전체 데이터 수집 (배열 병합)
+ * 연속조회로 전체 데이터를 수집하여 배열로 병합한다.
+ *
+ * @param maxPages - 무한 루프 방지를 위한 최대 페이지 수
+ * @throws {@link LSError} API 호출 실패 시
  */
 export const lsRequestAllPages = async <
   TItem,
@@ -216,7 +218,7 @@ export const lsRequestAllPages = async <
 >(
   options: Omit<LSRequestOptions, "continuation">,
   dataKey: keyof TResponse,
-  maxPages: number = 10 // 안전장치
+  maxPages: number = 10
 ): Promise<TItem[]> => {
   const allData: TItem[] = [];
   let pageCount = 0;
