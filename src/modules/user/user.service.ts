@@ -6,15 +6,15 @@ import logger from "../../config/logger";
 import prisma from "../../config/prisma";
 import redis from "../../config/redis";
 import {
-  generateVerificationCode,
-  sendVerificationEmail,
-} from "../../shared/utils/email";
-import { deleteAllRefreshTokens } from "../../shared/utils/token";
-import {
   BadRequestError,
   NotFoundError,
   UnauthorizedError,
 } from "../../shared/errors/AppError";
+import {
+  generateVerificationCode,
+  sendVerificationEmail,
+} from "../../shared/utils/email";
+import { deleteAllRefreshTokens } from "../../shared/utils/token";
 import { toUserResponse } from "./user.utils";
 
 /** Multer 파일에서 추출한 데이터. */
@@ -335,7 +335,13 @@ export const getUserCommunityStatsService = async (userId: number) => {
   };
 };
 
-/** 회원탈퇴를 처리한다. */
+/**
+ * 회원탈퇴를 처리한다.
+ *
+ * @remarks
+ * 소프트 삭제: 게시글, 댓글, 종목댓글, AI 분석이력
+ * 물리 삭제: 좋아요, 관심종목, 알림, 인증정보
+ */
 export const withdrawUserService = async (userId: number) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -346,14 +352,41 @@ export const withdrawUserService = async (userId: number) => {
   }
 
   const now = new Date();
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      deleted_at: now,
-      email: user.email ? `${user.email}_${now.getTime()}_deleted` : null,
-      nick: `${user.nick}_${now.getTime()}_deleted`,
-    },
-  });
+
+  await prisma.$transaction([
+    prisma.post.updateMany({
+      where: { author_id: userId },
+      data: { deleted_at: now },
+    }),
+    prisma.post_comment.updateMany({
+      where: { author_id: userId },
+      data: { deleted_at: now },
+    }),
+    prisma.stock_comment.updateMany({
+      where: { author_id: userId },
+      data: { deleted_at: now },
+    }),
+    prisma.ai_inference_history.updateMany({
+      where: { user_id: userId },
+      data: { deleted_at: now },
+    }),
+
+    prisma.post_like.deleteMany({ where: { user_id: userId } }),
+    prisma.stock_watch_list.deleteMany({ where: { user_id: userId } }),
+    prisma.notification.deleteMany({
+      where: { OR: [{ user_id: userId }, { actor_id: userId }] },
+    }),
+    prisma.auth_provider.deleteMany({ where: { user_id: userId } }),
+
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        deleted_at: now,
+        email: user.email ? `${user.email}_${now.getTime()}_deleted` : null,
+        nick: `${user.nick}_${now.getTime()}_deleted`,
+      },
+    }),
+  ]);
 
   await deleteAllRefreshTokens(userId);
 
