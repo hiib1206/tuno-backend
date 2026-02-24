@@ -124,6 +124,9 @@ tuno-backend/
 │   ├── generated/           # Prisma 생성 파일
 │   ├── app.ts               # Express 앱 설정
 │   └── index.ts             # 엔트리포인트
+├── test/                    # 테스트 (node:test + supertest)
+│   ├── unit/                # Unit 테스트 (스키마 검증)
+│   └── component/           # Component 테스트 (API 유효성 검사)
 ├── prisma/
 │   └── schema.prisma        # DB 스키마
 └── firebase/                # Firebase 서비스 계정
@@ -174,6 +177,20 @@ Zod 스키마 기반 OpenAPI 문서 자동 생성:
 - Swagger UI (`/api-docs`)로 API 문서 제공
 - 개발 환경에서만 활성화 (운영 환경 비활성화)
 - **샘플 구현**: auth 도메인만 문서화 (다른 도메인 확장 가능)
+
+### 테스트 (Testing)
+Node.js 내장 테스트 러너 + supertest 기반 테스트:
+- `node:test` + `node:assert` — 외부 의존성 없이 테스트
+- `supertest` — HTTP API 레벨 테스트
+- **Unit 테스트**: Zod 스키마 검증 로직 테스트
+- **Component 테스트**: Express 미들웨어 + API 유효성 검사 테스트
+- **샘플 구현**: auth 도메인 (다른 도메인 확장 가능)
+
+```bash
+npm test              # 전체 테스트 실행
+npm run test:unit     # Unit 테스트만 실행
+npm run test:component # Component 테스트만 실행
+```
 
 ## 설치 및 실행
 
