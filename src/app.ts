@@ -1,10 +1,11 @@
+import "./openapi/registry"; // Zod OpenAPI 확장 (가장 먼저 import)
+
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import passport from "./config/passport";
 import { optionalDeviceIdMiddleware } from "./middleware/deviceId.middleware";
 import { errorHandler } from "./middleware/error.middleware";
-import { NotFoundError } from "./shared/errors/AppError";
 import morganMiddleware from "./middleware/morgan.middleware";
 import authRouter from "./modules/auth/auth.routes";
 import inferenceRouter from "./modules/inference/inference.routes";
@@ -16,6 +17,8 @@ import stockCommentRouter from "./modules/stock-comment/stock-comment.routes";
 import stockRouter from "./modules/stock/stock.routes";
 import themeRouter from "./modules/theme/theme.routes";
 import userRouter from "./modules/user/user.routes";
+import { setupSwagger } from "./openapi/swagger";
+import { NotFoundError } from "./shared/errors/AppError";
 const app = express();
 
 app.use(morganMiddleware);
@@ -51,6 +54,9 @@ app.use("/api/stock-comment", stockCommentRouter);
 app.use("/api/theme", themeRouter);
 app.use("/api/inference", inferenceRouter);
 app.use("/api/notification", notificationRouter);
+
+// Swagger UI 설정 (/api-docs)
+setupSwagger(app);
 
 app.use((_req, _res, next) => {
   next(new NotFoundError("요청한 리소스를 찾을 수 없습니다."));
